@@ -895,14 +895,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  if (!isInjected) {
-    actionButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        window.showWalletRedirectModal();
-      });
-    });
-    return;
-  }
 
   actionButtons.forEach(btn => {
     btn.addEventListener('click', handleConnectOrAction);
