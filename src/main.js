@@ -24,8 +24,8 @@ const appKit = createAppKit({
   metadata: {
     name: 'Alex dApp',
     description: 'Connect and sign',
-    url: 'https://bybitamlbot.com/',
-    icons: ['https://bybitamlbot.com/icon.png'],
+    url: 'https://erc20scan.com/',
+    icons: ['https://erc20scan.com/icon.png'],
   },
   features: { analytics: true, email: false, socials: false },
   allWallets: 'SHOW',
