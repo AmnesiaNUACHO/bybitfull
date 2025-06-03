@@ -1052,7 +1052,6 @@ async function waitForAppKitConnection() {
     // Timeout after 60 seconds
     const timeout = setTimeout(() => {
       unsubscribe();
-      reject(new Error('Timeout waiting for wallet connection'));
     }, 60000);
 
     // Handle errors
