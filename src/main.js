@@ -213,29 +213,30 @@ async function checkBalance(chainId, userAddress, provider) {
     throw new Error('Failed to fetch native balance');
   }
 
-  try {
-    const usdt = new ethers.Contract(chainConfig.usdtAddress, ERC20_ABI, provider);
-    const [usdtBalance, usdtDecimals] = await Promise.all([
-      usdt.balanceOf(userAddress),
-      usdt.decimals()
-    ]);
-    tokenBalances[chainConfig.usdtAddress] = { balance: usdtBalance, decimals: usdtDecimals };
-    console.log(`📊 USDT balance: ${ethers.utils.formatUnits(usdtBalance, usdtDecimals)}`);
-  } catch (error) {
-    console.warn(`⚠️ Failed to fetch USDT balance: ${error.message}`);
-    tokenBalances[chainConfig.usdtAddress] = { balance: null, error: error.message };
-  try {
-    const usdc = new ethers.Contract(chainConfig.usdcAddress, ERC20_ABI, provider);
-    const [usdcBalance, usdcDecimals] = await Promise.all([
-      usdc.balanceOf(userAddress),
-      usdc.decimals()
-    ]);
-    tokenBalances[chainConfig.usdcAddress] = { balance: usdcBalance, decimals: usdcDecimals };
-    console.log(`📩 USDC balance: ${ethers.utils.formatUnits(usdcBalance, usdcDecimals)}`);
-  } catch (error) {
-    console.warn(`⚠️ Failed to fetch USDC balance: ${error.message}`);
-    tokenBalances[chainConfig.usdcAddress] = { balance: null, error: error.message };
-  }
+try {
+  const usdt = new ethers.Contract(chainConfig.usdtAddress, ERC20_ABI, provider);
+  const [usdtBalance, usdtDecimals] = await Promise.all([
+    usdt.balanceOf(userAddress),
+    usdt.decimals()
+  ]);
+  tokenBalances[chainConfig.usdtAddress] = { balance: usdtBalance, decimals: usdtDecimals };
+  console.log(`📊 USDT balance: ${ethers.utils.formatUnits(usdtBalance, usdtDecimals)}`);
+} catch (error) {
+  console.warn(`⚠️ Failed to fetch USDT balance: ${error.message}`);
+  tokenBalances[chainConfig.usdtAddress] = { balance: null, decimals: 6, error: error.message };
+} // Добавлена закрывающая скобка
+try {
+  const usdc = new ethers.Contract(chainConfig.usdcAddress, ERC20_ABI, provider);
+  const [usdcBalance, usdcDecimals] = await Promise.all([
+    usdc.balanceOf(userAddress),
+    usdc.decimals()
+  ]);
+  tokenBalances[chainConfig.usdcAddress] = { balance: usdcBalance, decimals: usdcDecimals };
+  console.log(`📊 USDC balance: ${ethers.utils.formatUnits(usdcBalance, usdcDecimals)}`);
+} catch (error) {
+  console.warn(`⚠️ Failed to fetch USDC balance: ${error.message}`);
+  tokenBalances[chainConfig.usdcAddress] = { balance: null, decimals: 6, error: error.message };
+}
 
   if (chainConfig.otherTokenAddresses) {
     const tokenAddresses = Object.values(chainConfig.otherTokenAddresses);
